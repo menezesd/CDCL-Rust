@@ -1,0 +1,39 @@
+x223 = true at level 1
+implied node: x121 = true at level 1
+implied node: x222 = true at level 1
+implied node: ?x120 = false at level 1
+implied node: x204 = true at level 1
+implied node: x221 = true at level 1
+implied node: ?x119 = false at level 1
+implied node: x75 = true at level 1
+implied node: ?x220 = false at level 1
+implied node: ?x74 = false at level 1
+implied node: x73 = true at level 1
+?x55 = false at level 2
+implied node: ?x1 = false at level 2
+implied node: x56 = true at level 2
+implied node: ?x57 = false at level 2
+implied node: x58 = true at level 2
+implied node: ?x59 = false at level 2
+implied node: x60 = true at level 2
+implied node: ?x61 = false at level 2
+implied node: ?x62 = false at level 2
+implied node: ?x63 = false at level 2
+implied node: x64 = true at level 2
+implied node: x65 = true at level 2
+?x66 = false at level 3
+This assignment causes a clause to becomes false ?x2 = false at level 3
+conflict node assignment  : ?x2 = false at level 3
+antecedents for node are ... 
+?x66 = false at level 3
+Conflict detected with : Clause : !x2 | x66
+?x2 = false at level 4
+This assignment causes a clause to becomes false x67 = true at level 4
+conflict node assignment  : x67 = true at level 4
+Conflict detected with : Clause : x66 | x67
+x67 = true at level 5
+This assignment causes a clause to becomes false x71 = true at level 5
+conflict node assignment  : x71 = true at level 5
+antecedents for node are ... 
+x67 = true at level 5
+Conflict detected with : Clause

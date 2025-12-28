@@ -1,0 +1,8 @@
+(not (or (equiv (equiv (not x1)
+                       (not (not x1)))
+                (impl (not x1)
+                      (and x2
+                           x1)))
+         (not (equiv (or x1
+                         x3)
+                     (not x4)))))

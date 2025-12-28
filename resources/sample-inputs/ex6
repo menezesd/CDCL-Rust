@@ -1,0 +1,1 @@
+(and (or x1 x3) (and (or (and x2 x1) (not x4)) (and x1 (not x3))))

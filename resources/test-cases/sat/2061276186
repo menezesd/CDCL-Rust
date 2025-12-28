@@ -1,0 +1,26 @@
+(impl (and (impl (and (and x1
+                           x2)
+                      (and x3
+                           x4))
+                 (not (not x3)))
+           (impl (impl (equiv x5
+                              (not x5))
+                       (or x6
+                           x4))
+                 (impl (or x7
+                           x8)
+                       (not x9))))
+      (or (impl (or (impl x4
+                          x2)
+                    (equiv x10
+                           (not x10)))
+                (not (equiv x1
+                            x11)))
+          (or (and (or x6
+                       x12)
+                   (or x12
+                       x10))
+              (or (equiv x5
+                         (not x5))
+                  (and x6
+                       (not x6))))))

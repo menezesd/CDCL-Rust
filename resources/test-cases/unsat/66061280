@@ -1,0 +1,14 @@
+(not (impl (equiv (equiv (equiv x1
+                                x1)
+                         (not (equiv x1
+                                     x1)))
+                  (not (equiv (equiv x1
+                                     x1)
+                              (not (equiv x1
+                                          x1)))))
+           (and (impl (and x2
+                           x1)
+                      (not x1))
+                (not (impl (and x2
+                                x1)
+                           (not x1))))))

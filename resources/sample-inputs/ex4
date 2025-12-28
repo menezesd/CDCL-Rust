@@ -1,0 +1,1 @@
+(impl x4 (or x1 (not (and x2 x3))))

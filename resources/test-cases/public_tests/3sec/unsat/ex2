@@ -1,0 +1,362 @@
+(impl (or (or (impl (equiv (not (or (and (not (impl x1
+                                                    x1))
+                                         (impl (equiv x1
+                                                      (not x1))
+                                               (and x2
+                                                    x2)))
+                                    (and (impl (equiv x3
+                                                      x2)
+                                               (impl x4
+                                                     x5))
+                                         (not (and x6
+                                                   (not x6))))))
+                           (impl (impl (not (or (and x7
+                                                     (not x7))
+                                                (impl x2
+                                                      x3)))
+                                       (not (or (equiv x8
+                                                       x9)
+                                                (equiv x6
+                                                       (not x6)))))
+                                 (and (or (or (or x10
+                                                  x11)
+                                              (impl x7
+                                                    x7))
+                                          (or (impl x12
+                                                    x1)
+                                              (not x11)))
+                                      (not (or (or (or x10
+                                                       x11)
+                                                   (impl x7
+                                                         x7))
+                                               (or (impl x12
+                                                         x1)
+                                                   (not x11)))))))
+                    (equiv (equiv (not (and (impl (or x1
+                                                      x13)
+                                                  (not x14))
+                                            (or (and x9
+                                                     x15)
+                                                (equiv x6
+                                                       x16))))
+                                  (and (impl (or (or x17
+                                                     x18)
+                                                 (and x7
+                                                      x11))
+                                             (or (impl x9
+                                                       x19)
+                                                 (not x20)))
+                                       (not (impl (or (or x17
+                                                          x18)
+                                                      (and x7
+                                                           x11))
+                                                  (or (impl x9
+                                                            x19)
+                                                      (not x20))))))
+                           (or (impl (equiv (impl (not x21)
+                                                  (and x11
+                                                       x22))
+                                            (impl (and x19
+                                                       (not x19))
+                                                  (and x13
+                                                       x23)))
+                                     (and (and (or x13
+                                                   x11)
+                                               (not (or x13
+                                                        x11)))
+                                          (equiv (not x24)
+                                                 (and x25
+                                                      x26))))
+                               (impl (and (and (equiv x17
+                                                      x7)
+                                               (not (equiv x17
+                                                           x7)))
+                                          (not (and (equiv x17
+                                                           x7)
+                                                    (not (equiv x17
+                                                                x7)))))
+                                     (and (impl (impl x27
+                                                      x28)
+                                                (or x16
+                                                    x24))
+                                          (not (impl (impl x27
+                                                           x28)
+                                                     (or x16
+                                                         x24))))))))
+              (impl (or (and (not (not (impl (or x23
+                                                 x5)
+                                             (not x29))))
+                             (and (not (not (impl x30
+                                                  x31)))
+                                  (not (not (not (impl x30
+                                                       x31))))))
+                        (or (equiv (and (and (impl x32
+                                                   x13)
+                                             (not (impl x32
+                                                        x13)))
+                                        (or (impl x22
+                                                  x33)
+                                            (and x13
+                                                 (not x13))))
+                                   (not (and (and (impl x32
+                                                        x13)
+                                                  (not (impl x32
+                                                             x13)))
+                                             (or (impl x22
+                                                       x33)
+                                                 (and x13
+                                                      (not x13))))))
+                            (not (and (and (or x34
+                                               x12)
+                                           (or x1
+                                               x35))
+                                      (not (and (or x34
+                                                    x12)
+                                                (or x1
+                                                    x35)))))))
+                    (impl (equiv (or (equiv (or (and x36
+                                                     x37)
+                                                (not x15))
+                                            (or (or x38
+                                                    x39)
+                                                (equiv x13
+                                                       x38)))
+                                     (impl (and (and x8
+                                                     x40)
+                                                (not (and x8
+                                                          x40)))
+                                           (or (equiv x41
+                                                      x42)
+                                               (and x25
+                                                    x43))))
+                                 (impl (and (not (equiv x44
+                                                        x45))
+                                            (not (equiv x46
+                                                        (not x46))))
+                                       (equiv (and (impl x5
+                                                         x47)
+                                                   (impl x3
+                                                         x11))
+                                              (not (and (impl x5
+                                                              x47)
+                                                        (impl x3
+                                                              x11))))))
+                          (impl (equiv (not (impl (or x36
+                                                      x15)
+                                                  (not x3)))
+                                       (and (and (not x48)
+                                                 (not x49))
+                                            (equiv (and x50
+                                                        x17)
+                                                   (not (and x50
+                                                             x17)))))
+                                (or (equiv (equiv (and x51
+                                                       x52)
+                                                  (impl x13
+                                                        x53))
+                                           (not (or x54
+                                                    x55)))
+                                    (or (or (not x54)
+                                            (equiv x56
+                                                   (not x56)))
+                                        (impl (or x3
+                                                  x57)
+                                              (not x58))))))))
+          (and (or (not (or (equiv (impl (not (and x59
+                                                   x16))
+                                         (impl (impl x60
+                                                     x41)
+                                               (equiv x61
+                                                      x25)))
+                                   (equiv (not (equiv x6
+                                                      (not x6)))
+                                          (or (or x25
+                                                  x62)
+                                              (not x30))))
+                            (impl (impl (and (or x38
+                                                 x63)
+                                             (equiv x64
+                                                    x65))
+                                        (not (and x1
+                                                  x12)))
+                                  (not (or (impl x66
+                                                 x67)
+                                           (or x68
+                                               x69))))))
+                   (equiv (and (and (impl (not (not x58))
+                                          (and (impl x70
+                                                     x38)
+                                               (or x71
+                                                   x50)))
+                                    (or (impl (or x72
+                                                  x71)
+                                              (or x73
+                                                  x9))
+                                        (equiv (equiv x74
+                                                      x62)
+                                               (not (equiv x74
+                                                           x62)))))
+                               (equiv (and (impl (equiv x61
+                                                        (not x61))
+                                                 (not x30))
+                                           (not (impl (equiv x61
+                                                             (not x61))
+                                                      (not x30))))
+                                      (not (and (impl (equiv x61
+                                                             (not x61))
+                                                      (not x30))
+                                                (not (impl (equiv x61
+                                                                  (not x61))
+                                                           (not x30)))))))
+                          (and (equiv (or (equiv (equiv x75
+                                                        x37)
+                                                 (or x76
+                                                     x77))
+                                          (equiv (equiv x2
+                                                        x42)
+                                                 (not x18)))
+                                      (not (or (equiv (equiv x75
+                                                             x37)
+                                                      (or x76
+                                                          x77))
+                                               (equiv (equiv x2
+                                                             x42)
+                                                      (not x18)))))
+                               (not (equiv (or (equiv (equiv x75
+                                                             x37)
+                                                      (or x76
+                                                          x77))
+                                               (equiv (equiv x2
+                                                             x42)
+                                                      (not x18)))
+                                           (not (or (equiv (equiv x75
+                                                                  x37)
+                                                           (or x76
+                                                               x77))
+                                                    (equiv (equiv x2
+                                                                  x42)
+                                                           (not x18)))))))))
+               (not (equiv (not (or (and (equiv (equiv x71
+                                                       x78)
+                                                (impl x79
+                                                      x55))
+                                         (not (equiv (equiv x71
+                                                            x78)
+                                                     (impl x79
+                                                           x55))))
+                                    (impl (or (equiv x80
+                                                     x50)
+                                              (or x81
+                                                  x30))
+                                          (impl (equiv x82
+                                                       x29)
+                                                (or x3
+                                                    x74)))))
+                           (not (not (or (and (equiv (equiv x71
+                                                            x78)
+                                                     (impl x79
+                                                           x55))
+                                              (not (equiv (equiv x71
+                                                                 x78)
+                                                          (impl x79
+                                                                x55))))
+                                         (impl (or (equiv x80
+                                                          x50)
+                                                   (or x81
+                                                       x30))
+                                               (impl (equiv x82
+                                                            x29)
+                                                     (or x3
+                                                         x74))))))))))
+      (and (not (equiv (impl (equiv (not (and (or (not x62)
+                                                  (impl x10
+                                                        x37))
+                                              (not (equiv x83
+                                                          (not x83)))))
+                                    (not (not (equiv (equiv x38
+                                                            x62)
+                                                     (not (equiv x38
+                                                                 x62))))))
+                             (not (or (impl (impl (equiv x84
+                                                         (not x84))
+                                                  (and x85
+                                                       x65))
+                                            (and (equiv x75
+                                                        (not x75))
+                                                 (not (equiv x75
+                                                             (not x75)))))
+                                      (impl (and (equiv x86
+                                                        x51)
+                                                 (or x87
+                                                     x6))
+                                            (and (not x88)
+                                                 (not (not x88)))))))
+                       (not (impl (equiv (not (and (or (not x62)
+                                                       (impl x10
+                                                             x37))
+                                                   (not (equiv x83
+                                                               (not x83)))))
+                                         (not (not (equiv (equiv x38
+                                                                 x62)
+                                                          (not (equiv x38
+                                                                      x62))))))
+                                  (not (or (impl (impl (equiv x84
+                                                              (not x84))
+                                                       (and x85
+                                                            x65))
+                                                 (and (equiv x75
+                                                             (not x75))
+                                                      (not (equiv x75
+                                                                  (not x75)))))
+                                           (impl (and (equiv x86
+                                                             x51)
+                                                      (or x87
+                                                          x6))
+                                                 (and (not x88)
+                                                      (not (not x88))))))))))
+           (not (not (equiv (impl (equiv (not (and (or (not x62)
+                                                       (impl x10
+                                                             x37))
+                                                   (not (equiv x83
+                                                               (not x83)))))
+                                         (not (not (equiv (equiv x38
+                                                                 x62)
+                                                          (not (equiv x38
+                                                                      x62))))))
+                                  (not (or (impl (impl (equiv x84
+                                                              (not x84))
+                                                       (and x85
+                                                            x65))
+                                                 (and (equiv x75
+                                                             (not x75))
+                                                      (not (equiv x75
+                                                                  (not x75)))))
+                                           (impl (and (equiv x86
+                                                             x51)
+                                                      (or x87
+                                                          x6))
+                                                 (and (not x88)
+                                                      (not (not x88)))))))
+                            (not (impl (equiv (not (and (or (not x62)
+                                                            (impl x10
+                                                                  x37))
+                                                        (not (equiv x83
+                                                                    (not x83)))))
+                                              (not (not (equiv (equiv x38
+                                                                      x62)
+                                                               (not (equiv x38
+                                                                           x62))))))
+                                       (not (or (impl (impl (equiv x84
+                                                                   (not x84))
+                                                            (and x85
+                                                                 x65))
+                                                      (and (equiv x75
+                                                                  (not x75))
+                                                           (not (equiv x75
+                                                                       (not x75)))))
+                                                (impl (and (equiv x86
+                                                                  x51)
+                                                           (or x87
+                                                               x6))
+                                                      (and (not x88)
+                                                           (not (not x88)))))))))))))
