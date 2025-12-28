@@ -711,6 +711,952 @@ impl CDCLSolver {
 }
 
 // ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ------------------------------------------------------------------------
+    // Parser Tests
+    // ------------------------------------------------------------------------
+
+    mod parser_tests {
+        use super::*;
+
+        #[test]
+        fn test_parse_single_variable() {
+            let mut parser = Parser::new("x1");
+            let expr = parser.parse();
+            assert!(matches!(expr, Expr::Var(1)));
+        }
+
+        #[test]
+        fn test_parse_variable_with_parens() {
+            let mut parser = Parser::new("(x42)");
+            let expr = parser.parse();
+            assert!(matches!(expr, Expr::Var(42)));
+        }
+
+        #[test]
+        fn test_parse_not() {
+            let mut parser = Parser::new("(not x1)");
+            let expr = parser.parse();
+            if let Expr::Not(inner) = expr {
+                assert!(matches!(*inner, Expr::Var(1)));
+            } else {
+                panic!("Expected Not expression");
+            }
+        }
+
+        #[test]
+        fn test_parse_and() {
+            let mut parser = Parser::new("(and x1 x2)");
+            let expr = parser.parse();
+            if let Expr::And(left, right) = expr {
+                assert!(matches!(*left, Expr::Var(1)));
+                assert!(matches!(*right, Expr::Var(2)));
+            } else {
+                panic!("Expected And expression");
+            }
+        }
+
+        #[test]
+        fn test_parse_or() {
+            let mut parser = Parser::new("(or x3 x4)");
+            let expr = parser.parse();
+            if let Expr::Or(left, right) = expr {
+                assert!(matches!(*left, Expr::Var(3)));
+                assert!(matches!(*right, Expr::Var(4)));
+            } else {
+                panic!("Expected Or expression");
+            }
+        }
+
+        #[test]
+        fn test_parse_impl() {
+            let mut parser = Parser::new("(impl x1 x2)");
+            let expr = parser.parse();
+            if let Expr::Impl(left, right) = expr {
+                assert!(matches!(*left, Expr::Var(1)));
+                assert!(matches!(*right, Expr::Var(2)));
+            } else {
+                panic!("Expected Impl expression");
+            }
+        }
+
+        #[test]
+        fn test_parse_equiv() {
+            let mut parser = Parser::new("(equiv x1 x2)");
+            let expr = parser.parse();
+            if let Expr::Equiv(left, right) = expr {
+                assert!(matches!(*left, Expr::Var(1)));
+                assert!(matches!(*right, Expr::Var(2)));
+            } else {
+                panic!("Expected Equiv expression");
+            }
+        }
+
+        #[test]
+        fn test_parse_nested() {
+            let mut parser = Parser::new("(and (or x1 x2) (not x3))");
+            let expr = parser.parse();
+            if let Expr::And(left, right) = expr {
+                assert!(matches!(*left, Expr::Or(_, _)));
+                assert!(matches!(*right, Expr::Not(_)));
+            } else {
+                panic!("Expected nested And expression");
+            }
+        }
+
+        #[test]
+        fn test_parse_deeply_nested() {
+            let mut parser = Parser::new("(and (or (not x1) x2) (impl x3 (equiv x4 x5)))");
+            let expr = parser.parse();
+            assert!(matches!(expr, Expr::And(_, _)));
+        }
+
+        #[test]
+        fn test_parse_whitespace_handling() {
+            let mut parser = Parser::new("  (  and   x1    x2  )  ");
+            let expr = parser.parse();
+            assert!(matches!(expr, Expr::And(_, _)));
+        }
+
+        #[test]
+        fn test_parse_large_variable_number() {
+            let mut parser = Parser::new("x999");
+            let expr = parser.parse();
+            assert!(matches!(expr, Expr::Var(999)));
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Literal Tests
+    // ------------------------------------------------------------------------
+
+    mod literal_tests {
+        use super::*;
+
+        #[test]
+        fn test_positive_literal() {
+            let lit = Literal::positive(5);
+            assert_eq!(lit.var, 5);
+            assert!(!lit.negated);
+            assert_eq!(lit.as_signed(), 5);
+        }
+
+        #[test]
+        fn test_negative_literal() {
+            let lit = Literal::negative(5);
+            assert_eq!(lit.var, 5);
+            assert!(lit.negated);
+            assert_eq!(lit.as_signed(), -5);
+        }
+
+        #[test]
+        fn test_literal_equality() {
+            let lit1 = Literal::positive(3);
+            let lit2 = Literal::positive(3);
+            let lit3 = Literal::negative(3);
+            assert_eq!(lit1, lit2);
+            assert_ne!(lit1, lit3);
+        }
+
+        #[test]
+        fn test_clause_creation() {
+            let clause = Clause::new(vec![
+                Literal::positive(1),
+                Literal::negative(2),
+            ]);
+            assert_eq!(clause.literals.len(), 2);
+        }
+
+        #[test]
+        fn test_unit_clause() {
+            let clause = Clause::unit(Literal::positive(7));
+            assert_eq!(clause.literals.len(), 1);
+            assert_eq!(clause.literals[0].var, 7);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // CNF Detection and Extraction Tests
+    // ------------------------------------------------------------------------
+
+    mod cnf_tests {
+        use super::*;
+
+        #[test]
+        fn test_is_clause_single_var() {
+            let expr = Expr::Var(1);
+            assert!(is_clause(&expr));
+        }
+
+        #[test]
+        fn test_is_clause_negated_var() {
+            let expr = Expr::Not(Box::new(Expr::Var(1)));
+            assert!(is_clause(&expr));
+        }
+
+        #[test]
+        fn test_is_clause_or_of_literals() {
+            let expr = Expr::Or(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Not(Box::new(Expr::Var(2)))),
+            );
+            assert!(is_clause(&expr));
+        }
+
+        #[test]
+        fn test_is_clause_nested_or() {
+            let expr = Expr::Or(
+                Box::new(Expr::Or(
+                    Box::new(Expr::Var(1)),
+                    Box::new(Expr::Var(2)),
+                )),
+                Box::new(Expr::Var(3)),
+            );
+            assert!(is_clause(&expr));
+        }
+
+        #[test]
+        fn test_is_clause_and_not_clause() {
+            let expr = Expr::And(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Var(2)),
+            );
+            assert!(!is_clause(&expr));
+        }
+
+        #[test]
+        fn test_is_clause_double_negation_not_clause() {
+            let expr = Expr::Not(Box::new(Expr::Not(Box::new(Expr::Var(1)))));
+            assert!(!is_clause(&expr));
+        }
+
+        #[test]
+        fn test_is_cnf_single_clause() {
+            let expr = Expr::Or(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Var(2)),
+            );
+            assert!(is_cnf(&expr));
+        }
+
+        #[test]
+        fn test_is_cnf_and_of_clauses() {
+            let expr = Expr::And(
+                Box::new(Expr::Or(
+                    Box::new(Expr::Var(1)),
+                    Box::new(Expr::Var(2)),
+                )),
+                Box::new(Expr::Or(
+                    Box::new(Expr::Var(3)),
+                    Box::new(Expr::Not(Box::new(Expr::Var(4)))),
+                )),
+            );
+            assert!(is_cnf(&expr));
+        }
+
+        #[test]
+        fn test_is_cnf_nested_and() {
+            let expr = Expr::And(
+                Box::new(Expr::And(
+                    Box::new(Expr::Var(1)),
+                    Box::new(Expr::Var(2)),
+                )),
+                Box::new(Expr::Var(3)),
+            );
+            assert!(is_cnf(&expr));
+        }
+
+        #[test]
+        fn test_is_cnf_impl_not_cnf() {
+            let expr = Expr::Impl(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Var(2)),
+            );
+            assert!(!is_cnf(&expr));
+        }
+
+        #[test]
+        fn test_extract_clause_literals() {
+            let expr = Expr::Or(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Not(Box::new(Expr::Var(2)))),
+            );
+            let mut lits = Vec::new();
+            assert!(extract_clause_literals(&expr, &mut lits));
+            assert_eq!(lits.len(), 2);
+            assert_eq!(lits[0].var, 1);
+            assert!(!lits[0].negated);
+            assert_eq!(lits[1].var, 2);
+            assert!(lits[1].negated);
+        }
+
+        #[test]
+        fn test_extract_cnf_clauses() {
+            let expr = Expr::And(
+                Box::new(Expr::Or(
+                    Box::new(Expr::Var(1)),
+                    Box::new(Expr::Var(2)),
+                )),
+                Box::new(Expr::Or(
+                    Box::new(Expr::Var(3)),
+                    Box::new(Expr::Var(4)),
+                )),
+            );
+            let mut clauses = Vec::new();
+            assert!(extract_cnf_clauses(&expr, &mut clauses));
+            assert_eq!(clauses.len(), 2);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Tseitin Transformation Tests
+    // ------------------------------------------------------------------------
+
+    mod tseitin_tests {
+        use super::*;
+
+        #[test]
+        fn test_find_max_var() {
+            let expr = Expr::And(
+                Box::new(Expr::Var(5)),
+                Box::new(Expr::Or(
+                    Box::new(Expr::Var(3)),
+                    Box::new(Expr::Var(10)),
+                )),
+            );
+            assert_eq!(find_max_var(&expr), 10);
+        }
+
+        #[test]
+        fn test_tseitin_single_var() {
+            let expr = Expr::Var(1);
+            let max_var = find_max_var(&expr);
+            let mut transformer = TseitinTransformer::new(max_var);
+            let root = transformer.transform(&expr);
+            assert_eq!(root, 1);
+            assert!(transformer.clauses.is_empty());
+        }
+
+        #[test]
+        fn test_tseitin_not() {
+            let expr = Expr::Not(Box::new(Expr::Var(1)));
+            let max_var = find_max_var(&expr);
+            let mut transformer = TseitinTransformer::new(max_var);
+            let root = transformer.transform(&expr);
+            // root should be a fresh variable (2)
+            assert_eq!(root, 2);
+            // NOT creates 2 clauses
+            assert_eq!(transformer.clauses.len(), 2);
+        }
+
+        #[test]
+        fn test_tseitin_and() {
+            let expr = Expr::And(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Var(2)),
+            );
+            let max_var = find_max_var(&expr);
+            let mut transformer = TseitinTransformer::new(max_var);
+            let root = transformer.transform(&expr);
+            // AND creates 3 clauses
+            assert_eq!(transformer.clauses.len(), 3);
+            assert_eq!(root, 3);
+        }
+
+        #[test]
+        fn test_tseitin_or() {
+            let expr = Expr::Or(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Var(2)),
+            );
+            let max_var = find_max_var(&expr);
+            let mut transformer = TseitinTransformer::new(max_var);
+            let root = transformer.transform(&expr);
+            // OR creates 3 clauses
+            assert_eq!(transformer.clauses.len(), 3);
+            assert_eq!(root, 3);
+        }
+
+        #[test]
+        fn test_tseitin_impl() {
+            let expr = Expr::Impl(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Var(2)),
+            );
+            let max_var = find_max_var(&expr);
+            let mut transformer = TseitinTransformer::new(max_var);
+            let root = transformer.transform(&expr);
+            // IMPL creates 3 clauses
+            assert_eq!(transformer.clauses.len(), 3);
+            assert_eq!(root, 3);
+        }
+
+        #[test]
+        fn test_tseitin_equiv() {
+            let expr = Expr::Equiv(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Var(2)),
+            );
+            let max_var = find_max_var(&expr);
+            let mut transformer = TseitinTransformer::new(max_var);
+            let root = transformer.transform(&expr);
+            // EQUIV creates 4 clauses
+            assert_eq!(transformer.clauses.len(), 4);
+            assert_eq!(root, 3);
+        }
+
+        #[test]
+        fn test_tseitin_into_clauses_adds_unit() {
+            let expr = Expr::And(
+                Box::new(Expr::Var(1)),
+                Box::new(Expr::Var(2)),
+            );
+            let max_var = find_max_var(&expr);
+            let mut transformer = TseitinTransformer::new(max_var);
+            let root = transformer.transform(&expr);
+            let clauses = transformer.into_clauses(root);
+            // AND creates 3 clauses + 1 unit clause for root
+            assert_eq!(clauses.len(), 4);
+            // Last clause should be unit clause asserting root
+            let last = &clauses[clauses.len() - 1];
+            assert_eq!(last.literals.len(), 1);
+            assert_eq!(last.literals[0].var, root);
+            assert!(!last.literals[0].negated);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // CDCL Solver Tests
+    // ------------------------------------------------------------------------
+
+    mod solver_tests {
+        use super::*;
+
+        fn solve_formula(input: &str) -> bool {
+            let mut parser = Parser::new(input);
+            let expr = parser.parse();
+
+            let clauses = if is_cnf(&expr) {
+                let mut clauses = Vec::new();
+                if extract_cnf_clauses(&expr, &mut clauses) {
+                    clauses
+                } else {
+                    let max_var = find_max_var(&expr);
+                    let mut transformer = TseitinTransformer::new(max_var);
+                    let root_var = transformer.transform(&expr);
+                    transformer.into_clauses(root_var)
+                }
+            } else {
+                let max_var = find_max_var(&expr);
+                let mut transformer = TseitinTransformer::new(max_var);
+                let root_var = transformer.transform(&expr);
+                transformer.into_clauses(root_var)
+            };
+
+            let mut solver = CDCLSolver::new(clauses);
+            solver.solve()
+        }
+
+        // Basic SAT tests
+        #[test]
+        fn test_single_variable_sat() {
+            assert!(solve_formula("x1"));
+        }
+
+        #[test]
+        fn test_two_variables_sat() {
+            assert!(solve_formula("(and x1 x2)"));
+        }
+
+        #[test]
+        fn test_or_sat() {
+            assert!(solve_formula("(or x1 x2)"));
+        }
+
+        // Basic UNSAT tests
+        #[test]
+        fn test_contradiction_unsat() {
+            assert!(!solve_formula("(and x1 (not x1))"));
+        }
+
+        #[test]
+        fn test_complex_unsat() {
+            // (x1 OR x2) AND (NOT x1) AND (NOT x2) is UNSAT
+            assert!(!solve_formula("(and (and (or x1 x2) (not x1)) (not x2))"));
+        }
+
+        // Tautology tests
+        #[test]
+        fn test_tautology_sat() {
+            assert!(solve_formula("(or x1 (not x1))"));
+        }
+
+        // Implication tests
+        #[test]
+        fn test_impl_sat() {
+            assert!(solve_formula("(impl x1 x2)"));
+        }
+
+        #[test]
+        fn test_impl_chain_sat() {
+            // (x1 -> x2) AND (x2 -> x3) AND x1 should be SAT
+            assert!(solve_formula("(and (and (impl x1 x2) (impl x2 x3)) x1)"));
+        }
+
+        // Equivalence tests
+        #[test]
+        fn test_equiv_sat() {
+            assert!(solve_formula("(equiv x1 x2)"));
+        }
+
+        #[test]
+        fn test_equiv_contradiction_unsat() {
+            // x1 <-> x2 AND x1 AND NOT x2 is UNSAT
+            assert!(!solve_formula("(and (and (equiv x1 x2) x1) (not x2))"));
+        }
+
+        // Complex formula tests
+        #[test]
+        fn test_nested_formula_sat() {
+            assert!(solve_formula("(or x1 (not (and x2 x3)))"));
+        }
+
+        #[test]
+        fn test_deeply_nested_sat() {
+            assert!(solve_formula("(and (or (not x1) x2) (or x1 x3))"));
+        }
+
+        // Edge cases
+        #[test]
+        fn test_unit_propagation_simple() {
+            // x1 AND (x1 -> x2) should result in both x1 and x2 being true
+            assert!(solve_formula("(and x1 (impl x1 x2))"));
+        }
+
+        #[test]
+        fn test_pigeonhole_small() {
+            // Simple pigeonhole: 2 pigeons, 1 hole (UNSAT)
+            // p11 = pigeon 1 in hole 1, p21 = pigeon 2 in hole 1
+            // Each pigeon must be in some hole: p11, p21
+            // At most one pigeon per hole: NOT (p11 AND p21)
+            // Combined: p11 AND p21 AND NOT (p11 AND p21) = UNSAT
+            assert!(!solve_formula("(and (and x1 x2) (not (and x1 x2)))"));
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Integration Tests
+    // ------------------------------------------------------------------------
+
+    mod integration_tests {
+        use super::*;
+
+        fn solve_formula(input: &str) -> bool {
+            let mut parser = Parser::new(input);
+            let expr = parser.parse();
+
+            let clauses = if is_cnf(&expr) {
+                let mut clauses = Vec::new();
+                if extract_cnf_clauses(&expr, &mut clauses) {
+                    clauses
+                } else {
+                    let max_var = find_max_var(&expr);
+                    let mut transformer = TseitinTransformer::new(max_var);
+                    let root_var = transformer.transform(&expr);
+                    transformer.into_clauses(root_var)
+                }
+            } else {
+                let max_var = find_max_var(&expr);
+                let mut transformer = TseitinTransformer::new(max_var);
+                let root_var = transformer.transform(&expr);
+                transformer.into_clauses(root_var)
+            };
+
+            let mut solver = CDCLSolver::new(clauses);
+            solver.solve()
+        }
+
+        #[test]
+        fn test_ex1_single_var() {
+            // ex1: x1 (SAT)
+            assert!(solve_formula("x1"));
+        }
+
+        #[test]
+        fn test_ex2_contradiction() {
+            // ex2: (and x1 (not x1)) (UNSAT)
+            assert!(!solve_formula("(and x1 (not x1))"));
+        }
+
+        #[test]
+        fn test_ex3_nested_or() {
+            // ex3: (or x1 (not (and x2 x3))) (SAT)
+            assert!(solve_formula("(or x1 (not (and x2 x3)))"));
+        }
+
+        #[test]
+        fn test_all_operators_combined() {
+            // Test formula using all operators
+            let formula = "(and (impl x1 x2) (equiv x3 (or x1 (not x4))))";
+            // This should be satisfiable
+            assert!(solve_formula(formula));
+        }
+
+        #[test]
+        fn test_cnf_direct_extraction() {
+            // A CNF formula that should be extracted directly
+            // (x1 OR x2) AND (NOT x1 OR x3)
+            let formula = "(and (or x1 x2) (or (not x1) x3))";
+            assert!(solve_formula(formula));
+        }
+
+        #[test]
+        fn test_larger_cnf() {
+            // Larger CNF formula
+            let formula = "(and (and (and (or x1 x2) (or (not x1) x3)) (or (not x2) x4)) (or x1 (not x4)))";
+            assert!(solve_formula(formula));
+        }
+
+        #[test]
+        fn test_unsat_3_clauses() {
+            // (x1) AND (NOT x1 OR x2) AND (NOT x2) is UNSAT
+            // After unit propagation: x1=T, x2=T, but (NOT x2) conflicts
+            let formula = "(and (and x1 (or (not x1) x2)) (not x2))";
+            assert!(!solve_formula(formula));
+        }
+
+        #[test]
+        fn test_chain_implication_sat() {
+            // Chain of implications that is satisfiable
+            let formula = "(and (and (and (impl x1 x2) (impl x2 x3)) (impl x3 x4)) (and x1 x4))";
+            assert!(solve_formula(formula));
+        }
+
+        #[test]
+        fn test_chain_implication_unsat() {
+            // Chain of implications with contradiction
+            // x1 -> x2 -> x3, x1 AND NOT x3
+            let formula = "(and (and (and (impl x1 x2) (impl x2 x3)) x1) (not x3))";
+            assert!(!solve_formula(formula));
+        }
+
+        #[test]
+        fn test_equiv_chain_sat() {
+            // x1 <-> x2 <-> x3 with x1 AND x3
+            let formula = "(and (and (equiv x1 x2) (equiv x2 x3)) (and x1 x3))";
+            assert!(solve_formula(formula));
+        }
+
+        #[test]
+        fn test_equiv_chain_unsat() {
+            // x1 <-> x2 <-> x3 with x1 AND NOT x3
+            let formula = "(and (and (equiv x1 x2) (equiv x2 x3)) (and x1 (not x3)))";
+            assert!(!solve_formula(formula));
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Property-Based Tests
+    // ------------------------------------------------------------------------
+
+    mod property_tests {
+        use super::*;
+        use proptest::prelude::*;
+
+        fn solve_formula(input: &str) -> bool {
+            let mut parser = Parser::new(input);
+            let expr = parser.parse();
+
+            let clauses = if is_cnf(&expr) {
+                let mut clauses = Vec::new();
+                if extract_cnf_clauses(&expr, &mut clauses) {
+                    clauses
+                } else {
+                    let max_var = find_max_var(&expr);
+                    let mut transformer = TseitinTransformer::new(max_var);
+                    let root_var = transformer.transform(&expr);
+                    transformer.into_clauses(root_var)
+                }
+            } else {
+                let max_var = find_max_var(&expr);
+                let mut transformer = TseitinTransformer::new(max_var);
+                let root_var = transformer.transform(&expr);
+                transformer.into_clauses(root_var)
+            };
+
+            let mut solver = CDCLSolver::new(clauses);
+            solver.solve()
+        }
+
+        // Strategy to generate expression AST
+        fn arb_expr(depth: u32, max_var: i32) -> impl Strategy<Value = Expr> {
+            let leaf = (1..=max_var).prop_map(Expr::Var);
+
+            if depth == 0 {
+                leaf.boxed()
+            } else {
+                prop_oneof![
+                    // Variables (more weight)
+                    3 => (1..=max_var).prop_map(Expr::Var),
+                    // Unary
+                    1 => arb_expr(depth - 1, max_var).prop_map(|e| Expr::Not(Box::new(e))),
+                    // Binary ops
+                    1 => (arb_expr(depth - 1, max_var), arb_expr(depth - 1, max_var))
+                        .prop_map(|(a, b)| Expr::And(Box::new(a), Box::new(b))),
+                    1 => (arb_expr(depth - 1, max_var), arb_expr(depth - 1, max_var))
+                        .prop_map(|(a, b)| Expr::Or(Box::new(a), Box::new(b))),
+                    1 => (arb_expr(depth - 1, max_var), arb_expr(depth - 1, max_var))
+                        .prop_map(|(a, b)| Expr::Impl(Box::new(a), Box::new(b))),
+                    1 => (arb_expr(depth - 1, max_var), arb_expr(depth - 1, max_var))
+                        .prop_map(|(a, b)| Expr::Equiv(Box::new(a), Box::new(b))),
+                ].boxed()
+            }
+        }
+
+        // Convert Expr to string representation
+        fn expr_to_string(expr: &Expr) -> String {
+            match expr {
+                Expr::Var(v) => format!("x{}", v),
+                Expr::Not(e) => format!("(not {})", expr_to_string(e)),
+                Expr::And(a, b) => format!("(and {} {})", expr_to_string(a), expr_to_string(b)),
+                Expr::Or(a, b) => format!("(or {} {})", expr_to_string(a), expr_to_string(b)),
+                Expr::Impl(a, b) => format!("(impl {} {})", expr_to_string(a), expr_to_string(b)),
+                Expr::Equiv(a, b) => format!("(equiv {} {})", expr_to_string(a), expr_to_string(b)),
+            }
+        }
+
+        proptest! {
+            // Property: Any single variable is satisfiable
+            #[test]
+            fn prop_single_var_sat(var in 1..100i32) {
+                let formula = format!("x{}", var);
+                prop_assert!(solve_formula(&formula));
+            }
+
+            // Property: x AND NOT x is always unsatisfiable
+            #[test]
+            fn prop_contradiction_unsat(var in 1..100i32) {
+                let formula = format!("(and x{} (not x{}))", var, var);
+                prop_assert!(!solve_formula(&formula));
+            }
+
+            // Property: x OR NOT x is always satisfiable (tautology)
+            #[test]
+            fn prop_tautology_sat(var in 1..100i32) {
+                let formula = format!("(or x{} (not x{}))", var, var);
+                prop_assert!(solve_formula(&formula));
+            }
+
+            // Property: x IMPL x is always satisfiable (reflexive implication)
+            #[test]
+            fn prop_reflexive_impl_sat(var in 1..100i32) {
+                let formula = format!("(impl x{} x{})", var, var);
+                prop_assert!(solve_formula(&formula));
+            }
+
+            // Property: x EQUIV x is always satisfiable (reflexive equivalence)
+            #[test]
+            fn prop_reflexive_equiv_sat(var in 1..100i32) {
+                let formula = format!("(equiv x{} x{})", var, var);
+                prop_assert!(solve_formula(&formula));
+            }
+
+            // Property: NOT NOT x is equivalent to x (solver terminates)
+            #[test]
+            fn prop_double_negation(var in 1..100i32) {
+                let formula = format!("(not (not x{}))", var);
+                prop_assert!(solve_formula(&formula));
+            }
+
+            // Property: (x AND y) OR (NOT x AND NOT y) is satisfiable
+            #[test]
+            fn prop_xor_like_sat(x in 1..50i32, y in 51..100i32) {
+                let formula = format!(
+                    "(or (and x{} x{}) (and (not x{}) (not x{})))",
+                    x, y, x, y
+                );
+                prop_assert!(solve_formula(&formula));
+            }
+
+            // Property: Implication chain with antecedent true is satisfiable
+            #[test]
+            fn prop_impl_chain_sat(n in 2..5usize) {
+                let mut formula = format!("x1");
+                for i in 1..n {
+                    formula = format!("(and {} (impl x{} x{}))", formula, i, i + 1);
+                }
+                prop_assert!(solve_formula(&formula));
+            }
+
+            // Property: Implication chain with contradiction is unsatisfiable
+            #[test]
+            fn prop_impl_chain_unsat(n in 2..5usize) {
+                let mut formula = format!("(and x1 (not x{}))", n);
+                for i in 1..n {
+                    formula = format!("(and {} (impl x{} x{}))", formula, i, i + 1);
+                }
+                prop_assert!(!solve_formula(&formula));
+            }
+
+            // Property: Random expressions should terminate (solver doesn't hang)
+            #[test]
+            fn prop_solver_terminates(expr in arb_expr(3, 5)) {
+                let formula = expr_to_string(&expr);
+                // Just verify it terminates and returns a boolean
+                let _result = solve_formula(&formula);
+            }
+
+            // Property: Parser round-trip works for generated expressions
+            #[test]
+            fn prop_parser_roundtrip(expr in arb_expr(2, 5)) {
+                let formula = expr_to_string(&expr);
+                let mut parser = Parser::new(&formula);
+                let parsed = parser.parse();
+                let reparsed = expr_to_string(&parsed);
+                prop_assert_eq!(formula, reparsed);
+            }
+
+            // Property: CNF formulas should solve faster (via direct extraction)
+            #[test]
+            fn prop_cnf_formula_solves(
+                num_clauses in 2..5usize,
+                clause_size in 2..4usize,
+                num_vars in 3..6i32
+            ) {
+                // Generate a random CNF formula
+                let mut clauses = Vec::new();
+                for _ in 0..num_clauses {
+                    let mut clause = String::new();
+                    for j in 0..clause_size {
+                        let var = (j as i32 % num_vars) + 1;
+                        let lit = if j % 2 == 0 {
+                            format!("x{}", var)
+                        } else {
+                            format!("(not x{})", var)
+                        };
+                        if clause.is_empty() {
+                            clause = lit;
+                        } else {
+                            clause = format!("(or {} {})", clause, lit);
+                        }
+                    }
+                    clauses.push(clause);
+                }
+                let mut formula = clauses[0].clone();
+                for clause in clauses.iter().skip(1) {
+                    formula = format!("(and {} {})", formula, clause);
+                }
+                // Just verify it terminates
+                let _result = solve_formula(&formula);
+            }
+
+            // Property: De Morgan's laws - NOT (a AND b) = NOT a OR NOT b
+            #[test]
+            fn prop_demorgan_and(a in 1..50i32, b in 51..100i32) {
+                // Both should be equisatisfiable with any assignment
+                let formula1 = format!("(not (and x{} x{}))", a, b);
+                let formula2 = format!("(or (not x{}) (not x{}))", a, b);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: De Morgan's laws - NOT (a OR b) = NOT a AND NOT b
+            #[test]
+            fn prop_demorgan_or(a in 1..50i32, b in 51..100i32) {
+                let formula1 = format!("(not (or x{} x{}))", a, b);
+                let formula2 = format!("(and (not x{}) (not x{}))", a, b);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: Implication equivalence - (a IMPL b) = (NOT a OR b)
+            #[test]
+            fn prop_impl_equiv(a in 1..50i32, b in 51..100i32) {
+                let formula1 = format!("(impl x{} x{})", a, b);
+                let formula2 = format!("(or (not x{}) x{})", a, b);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: Equivalence definition - (a EQUIV b) = (a IMPL b) AND (b IMPL a)
+            #[test]
+            fn prop_equiv_definition(a in 1..50i32, b in 51..100i32) {
+                let formula1 = format!("(equiv x{} x{})", a, b);
+                let formula2 = format!("(and (impl x{} x{}) (impl x{} x{}))", a, b, b, a);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: Commutative AND
+            #[test]
+            fn prop_and_commutative(a in 1..50i32, b in 51..100i32) {
+                let formula1 = format!("(and x{} x{})", a, b);
+                let formula2 = format!("(and x{} x{})", b, a);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: Commutative OR
+            #[test]
+            fn prop_or_commutative(a in 1..50i32, b in 51..100i32) {
+                let formula1 = format!("(or x{} x{})", a, b);
+                let formula2 = format!("(or x{} x{})", b, a);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: Commutative EQUIV
+            #[test]
+            fn prop_equiv_commutative(a in 1..50i32, b in 51..100i32) {
+                let formula1 = format!("(equiv x{} x{})", a, b);
+                let formula2 = format!("(equiv x{} x{})", b, a);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: Associative AND - solver gives same result
+            #[test]
+            fn prop_and_associative(a in 1..33i32, b in 34..66i32, c in 67..100i32) {
+                let formula1 = format!("(and (and x{} x{}) x{})", a, b, c);
+                let formula2 = format!("(and x{} (and x{} x{}))", a, b, c);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: Associative OR - solver gives same result
+            #[test]
+            fn prop_or_associative(a in 1..33i32, b in 34..66i32, c in 67..100i32) {
+                let formula1 = format!("(or (or x{} x{}) x{})", a, b, c);
+                let formula2 = format!("(or x{} (or x{} x{}))", a, b, c);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: Absorption - a AND (a OR b) = a
+            #[test]
+            fn prop_absorption_and(a in 1..50i32, b in 51..100i32) {
+                let formula = format!("(and x{} (or x{} x{}))", a, a, b);
+                // Should be SAT if and only if x_a is assigned true
+                prop_assert!(solve_formula(&formula));
+            }
+
+            // Property: Idempotent AND - a AND a = a
+            #[test]
+            fn prop_idempotent_and(a in 1..100i32) {
+                let formula1 = format!("x{}", a);
+                let formula2 = format!("(and x{} x{})", a, a);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+
+            // Property: Idempotent OR - a OR a = a
+            #[test]
+            fn prop_idempotent_or(a in 1..100i32) {
+                let formula1 = format!("x{}", a);
+                let formula2 = format!("(or x{} x{})", a, a);
+                prop_assert_eq!(solve_formula(&formula1), solve_formula(&formula2));
+            }
+        }
+    }
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
