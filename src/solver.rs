@@ -114,7 +114,8 @@ impl Ord for VarHeapEntry {
 ///
 /// This solver implements the Conflict-Driven Clause Learning algorithm
 /// with modern optimizations including two-watched literals, first-UIP
-/// learning, non-chronological backtracking, and VSIDS variable selection.
+/// learning, non-chronological backtracking, VSIDS variable selection,
+/// phase saving, and restarts.
 pub struct CDCLSolver {
     /// All clauses (original and learned), stored as signed literals.
     clauses: Vec<Vec<i32>>,
@@ -158,6 +159,30 @@ pub struct CDCLSolver {
 
     /// True if a conflict was detected during initialization.
     initial_conflict: bool,
+
+    // ========================================================================
+    // Phase Saving
+    // ========================================================================
+
+    /// Saved phase (polarity) for each variable.
+    /// When branching, we use the last assigned value for better convergence.
+    saved_phase: Vec<bool>,
+
+    // ========================================================================
+    // Restart Management
+    // ========================================================================
+
+    /// Total number of conflicts encountered.
+    conflicts: u64,
+
+    /// Number of conflicts until next restart.
+    conflicts_until_restart: u64,
+
+    /// Current index in the Luby sequence.
+    luby_index: u32,
+
+    /// Base unit for Luby restarts (number of conflicts).
+    luby_unit: u64,
 }
 
 impl CDCLSolver {
@@ -258,6 +283,13 @@ impl CDCLSolver {
             var_heap,
             in_heap,
             initial_conflict: false,
+            // Phase saving: default to true (positive polarity)
+            saved_phase: vec![true; num_vars as usize + 1],
+            // Restart management
+            conflicts: 0,
+            conflicts_until_restart: 100,  // First restart after 100 conflicts
+            luby_index: 0,
+            luby_unit: 100,
         };
 
         // Assign unit clauses at decision level 0
@@ -302,16 +334,21 @@ impl CDCLSolver {
 
     /// Assigns a value to a literal.
     ///
-    /// Records the assignment on the trail and adds it to the propagation queue.
+    /// Records the assignment on the trail, adds it to the propagation queue,
+    /// and saves the phase for future branching decisions.
     fn assign(&mut self, lit: i32, antecedent: Option<usize>) {
         let var = lit.unsigned_abs() as usize;
-        self.values[var] = if lit > 0 { 1 } else { -1 };
+        let is_positive = lit > 0;
+        self.values[var] = if is_positive { 1 } else { -1 };
         self.assignments[var] = Some(Assignment {
             decision_level: self.decision_level,
             antecedent_clause: antecedent,
         });
         self.trail.push(lit);
         self.propagation_queue.push_back(lit);
+
+        // Phase saving: remember the polarity we assigned
+        self.saved_phase[var] = is_positive;
 
         // Remove from heap (mark as not in heap)
         self.in_heap[var] = false;
@@ -405,16 +442,17 @@ impl CDCLSolver {
         None
     }
 
-    /// Selects the next branching variable using VSIDS.
+    /// Selects the next branching literal using VSIDS and phase saving.
     ///
     /// Uses a binary heap to efficiently find the unassigned variable
-    /// with the highest activity score.
+    /// with the highest activity score, then uses the saved phase to
+    /// determine the polarity.
     ///
     /// # Returns
     ///
-    /// - `Some(var)` - The variable to branch on
+    /// - `Some(lit)` - The literal to branch on (positive or negative)
     /// - `None` - All variables are assigned (SAT)
-    fn pick_branching_variable(&mut self) -> Option<i32> {
+    fn pick_branching_literal(&mut self) -> Option<i32> {
         // Pop entries until we find an unassigned variable
         while let Some(entry) = self.var_heap.pop() {
             let var = entry.var as usize;
@@ -424,7 +462,13 @@ impl CDCLSolver {
                 // Check if the activity is current (entry might be stale)
                 if (entry.activity - self.var_activity[var]).abs() < 1e-10 {
                     self.in_heap[var] = false;
-                    return Some(entry.var);
+                    // Use saved phase to determine polarity
+                    let lit = if self.saved_phase[var] {
+                        entry.var  // positive literal
+                    } else {
+                        -entry.var // negative literal
+                    };
+                    return Some(lit);
                 } else {
                     // Stale entry - push updated one
                     self.var_heap.push(VarHeapEntry {
@@ -616,6 +660,54 @@ impl CDCLSolver {
         }
     }
 
+    // ========================================================================
+    // Restart Management
+    // ========================================================================
+
+    /// Computes the i-th element of the Luby sequence (0-indexed).
+    ///
+    /// The Luby sequence is: 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, ...
+    /// It has theoretical optimality guarantees for restart strategies.
+    fn luby(i: u32) -> u32 {
+        let mut size = 1u32;
+        let mut seq = 1u32;
+
+        // Find the smallest complete binary tree containing index i
+        while size <= i {
+            size = 2 * size + 1;
+            seq *= 2;
+        }
+
+        // Navigate to find the value
+        while size - 1 != i {
+            size /= 2;
+            if i >= size {
+                // Recurse into right subtree
+                return Self::luby(i - size);
+            }
+            seq /= 2;
+        }
+
+        seq
+    }
+
+    /// Performs a restart by backtracking to decision level 0.
+    ///
+    /// Learned clauses are kept to guide future search.
+    fn restart(&mut self) {
+        self.backtrack(0);
+
+        // Update restart schedule using Luby sequence
+        self.luby_index += 1;
+        self.conflicts_until_restart = self.luby_unit * Self::luby(self.luby_index) as u64;
+    }
+
+    /// Checks if it's time to restart based on conflict count.
+    #[inline]
+    fn should_restart(&self) -> bool {
+        self.conflicts >= self.conflicts_until_restart
+    }
+
     /// Solves the SAT problem.
     ///
     /// # Returns
@@ -656,18 +748,26 @@ impl CDCLSolver {
         }
 
         loop {
-            match self.pick_branching_variable() {
-                Some(var) => {
-                    // Make a decision
+            // Check if we should restart
+            if self.should_restart() {
+                self.restart();
+            }
+
+            match self.pick_branching_literal() {
+                Some(lit) => {
+                    // Make a decision (lit already has the correct polarity from phase saving)
                     self.decision_level += 1;
                     self.trail_lim.push(self.trail.len());
-                    self.assign(var, None);
+                    self.assign(lit, None);
 
                     // Propagate and handle conflicts
                     loop {
                         match self.propagate() {
                             None => break,
                             Some(conflict_clause) => {
+                                // Count conflicts for restart scheduling
+                                self.conflicts += 1;
+
                                 if self.decision_level == 0 {
                                     // Conflict at level 0 - unsatisfiable
                                     return Ok(false);
@@ -1159,5 +1259,107 @@ mod tests {
         ];
         let mut solver = CDCLSolver::new(clauses);
         assert!(solver.solve().unwrap());
+    }
+
+    // ========================================================================
+    // Luby Sequence Tests
+    // ========================================================================
+
+    #[test]
+    fn test_luby_sequence_values() {
+        // The Luby sequence: 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, ...
+        assert_eq!(CDCLSolver::luby(0), 1);
+        assert_eq!(CDCLSolver::luby(1), 1);
+        assert_eq!(CDCLSolver::luby(2), 2);
+        assert_eq!(CDCLSolver::luby(3), 1);
+        assert_eq!(CDCLSolver::luby(4), 1);
+        assert_eq!(CDCLSolver::luby(5), 2);
+        assert_eq!(CDCLSolver::luby(6), 4);
+        assert_eq!(CDCLSolver::luby(7), 1);
+        assert_eq!(CDCLSolver::luby(8), 1);
+        assert_eq!(CDCLSolver::luby(9), 2);
+        assert_eq!(CDCLSolver::luby(10), 1);
+        assert_eq!(CDCLSolver::luby(11), 1);
+        assert_eq!(CDCLSolver::luby(12), 2);
+        assert_eq!(CDCLSolver::luby(13), 4);
+        assert_eq!(CDCLSolver::luby(14), 8);
+    }
+
+    #[test]
+    fn test_luby_powers_of_two() {
+        // At indices 2^n - 2, the Luby value is 2^(n-1)
+        // Index 0: 1, Index 2: 2, Index 6: 4, Index 14: 8, Index 30: 16
+        assert_eq!(CDCLSolver::luby(0), 1);
+        assert_eq!(CDCLSolver::luby(2), 2);
+        assert_eq!(CDCLSolver::luby(6), 4);
+        assert_eq!(CDCLSolver::luby(14), 8);
+        assert_eq!(CDCLSolver::luby(30), 16);
+    }
+
+    // ========================================================================
+    // Phase Saving Tests
+    // ========================================================================
+
+    #[test]
+    fn test_phase_saving_initialization() {
+        // All phases should default to true (positive)
+        let clauses = vec![make_clause(&[(1, false), (2, false)])];
+        let solver = CDCLSolver::new(clauses);
+        assert!(solver.saved_phase[1]);
+        assert!(solver.saved_phase[2]);
+    }
+
+    #[test]
+    fn test_phase_saving_updates() {
+        // Phase should be saved when a variable is assigned
+        let clauses = vec![
+            make_clause(&[(1, true)]),  // Forces x1 = false
+            make_clause(&[(2, false), (3, false)]),
+        ];
+        let mut solver = CDCLSolver::new(clauses);
+        solver.solve().unwrap();
+        // x1 was forced to false, so saved_phase should be false
+        assert!(!solver.saved_phase[1]);
+    }
+
+    // ========================================================================
+    // Restart Tests
+    // ========================================================================
+
+    #[test]
+    fn test_restart_initialization() {
+        let clauses = vec![make_clause(&[(1, false), (2, false)])];
+        let solver = CDCLSolver::new(clauses);
+        assert_eq!(solver.conflicts, 0);
+        assert_eq!(solver.luby_index, 0);
+        assert_eq!(solver.luby_unit, 100);
+        assert_eq!(solver.conflicts_until_restart, 100);
+    }
+
+    #[test]
+    fn test_should_restart() {
+        let clauses = vec![make_clause(&[(1, false), (2, false)])];
+        let mut solver = CDCLSolver::new(clauses);
+        assert!(!solver.should_restart());
+        solver.conflicts = 100;
+        assert!(solver.should_restart());
+        solver.conflicts = 99;
+        assert!(!solver.should_restart());
+    }
+
+    #[test]
+    fn test_restart_updates_schedule() {
+        let clauses = vec![make_clause(&[(1, false), (2, false)])];
+        let mut solver = CDCLSolver::new(clauses);
+        let _initial_restart = solver.conflicts_until_restart;
+        solver.restart();
+        // After restart, luby_index increases and schedule is updated
+        assert_eq!(solver.luby_index, 1);
+        // Luby(1) = 1, so conflicts_until_restart = 100 * 1 = 100
+        assert_eq!(solver.conflicts_until_restart, 100);
+        solver.restart();
+        assert_eq!(solver.luby_index, 2);
+        // Luby(2) = 2, so conflicts_until_restart = 100 * 2 = 200
+        assert_eq!(solver.conflicts_until_restart, 200);
     }
 }
