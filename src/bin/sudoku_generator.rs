@@ -178,10 +178,9 @@ fn has_unique_solution(clues: &[(usize, usize, usize)]) -> bool {
 
     // Add blocking clause to exclude this solution
     let mut blocking = Vec::new();
-    for r in 0..9 {
-        for c in 0..9 {
-            let d = solution[r][c] as usize;
-            blocking.push(Literal::negative(var(r + 1, c + 1, d)));
+    for (r, sol_row) in solution.iter().enumerate() {
+        for (c, &d) in sol_row.iter().enumerate() {
+            blocking.push(Literal::negative(var(r + 1, c + 1, d as usize)));
         }
     }
     clauses.push(Clause::new(blocking));
@@ -200,7 +199,9 @@ fn generate_complete_grid() -> [[u8; 9]; 9] {
 }
 
 /// Generate a Sudoku puzzle with the specified number of clues.
-fn generate_puzzle(target_clues: usize) -> (Vec<(usize, usize, usize)>, [[u8; 9]; 9]) {
+type Puzzle = (Vec<(usize, usize, usize)>, [[u8; 9]; 9]);
+
+fn generate_puzzle(target_clues: usize) -> Puzzle {
     let mut rng = rand::thread_rng();
 
     // Start with a complete grid
@@ -256,7 +257,7 @@ fn print_puzzle(clues: &[(usize, usize, usize)]) {
             if digit == 0 {
                 print!(". ");
             } else {
-                print!("{} ", digit);
+                print!("{digit} ");
             }
         }
         println!();
@@ -273,7 +274,7 @@ fn print_solution(grid: &[[u8; 9]; 9]) {
             if j > 0 && j % 3 == 0 {
                 print!("| ");
             }
-            print!("{} ", digit);
+            print!("{digit} ");
         }
         println!();
     }
@@ -307,12 +308,12 @@ fn main() {
         "hard" => rand::thread_rng().gen_range(22..=27),
         "expert" => rand::thread_rng().gen_range(17..=21),
         _ => {
-            eprintln!("Unknown difficulty: {}. Using medium.", difficulty);
+            eprintln!("Unknown difficulty: {difficulty}. Using medium.");
             rand::thread_rng().gen_range(28..=34)
         }
     };
 
-    eprintln!("Generating {} puzzle with ~{} clues...", difficulty, target_clues);
+    eprintln!("Generating {difficulty} puzzle with ~{target_clues} clues...");
 
     let (clues, solution) = generate_puzzle(target_clues);
 
@@ -351,17 +352,17 @@ mod tests {
         let grid = generate_complete_grid();
 
         // Check all cells are filled
-        for r in 0..9 {
-            for c in 0..9 {
-                assert!(grid[r][c] >= 1 && grid[r][c] <= 9);
+        for row in &grid {
+            for &cell in row {
+                assert!((1..=9).contains(&cell));
             }
         }
 
         // Check rows
-        for r in 0..9 {
+        for row in &grid {
             let mut seen = [false; 10];
-            for c in 0..9 {
-                let d = grid[r][c] as usize;
+            for &cell in row {
+                let d = cell as usize;
                 assert!(!seen[d], "Duplicate in row");
                 seen[d] = true;
             }
@@ -370,8 +371,8 @@ mod tests {
         // Check columns
         for c in 0..9 {
             let mut seen = [false; 10];
-            for r in 0..9 {
-                let d = grid[r][c] as usize;
+            for row in &grid {
+                let d = row[c] as usize;
                 assert!(!seen[d], "Duplicate in column");
                 seen[d] = true;
             }

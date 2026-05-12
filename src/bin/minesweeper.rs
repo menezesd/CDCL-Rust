@@ -213,7 +213,7 @@ fn main() {
     let (rows, cols, board) = match parse_input() {
         Ok(data) => data,
         Err(e) => {
-            eprintln!("Parse error: {}", e);
+            eprintln!("Parse error: {e}");
             process::exit(1);
         }
     };
@@ -224,9 +224,9 @@ fn main() {
     println!("=====================");
 
     // For each unknown cell, check if it must be a mine or must be safe
-    for r in 0..rows {
-        for c in 0..cols {
-            if board[r][c] != Cell::Unknown {
+    for (r, board_row) in board.iter().enumerate().take(rows) {
+        for (c, cell) in board_row.iter().enumerate().take(cols) {
+            if *cell != Cell::Unknown {
                 continue;
             }
 
@@ -252,10 +252,10 @@ fn main() {
 
     // Print the board with analysis
     println!("\nBoard (M=mine, S=safe, ?=unknown):");
-    for r in 0..rows {
-        for c in 0..cols {
-            match board[r][c] {
-                Cell::Number(n) => print!("{} ", n),
+    for (r, board_row) in board.iter().enumerate().take(rows) {
+        for (c, cell) in board_row.iter().enumerate().take(cols) {
+            match *cell {
+                Cell::Number(n) => print!("{n} "),
                 Cell::Mine => print!("* "),
                 Cell::Unknown => {
                     let cell_var = var(cols, r, c);

@@ -48,8 +48,7 @@ fn generate_exact_cover_clauses(
     }
 
     // For each element:
-    for elem in 1..=num_elements {
-        let containing_subsets = &element_to_subsets[elem];
+    for containing_subsets in element_to_subsets.iter().take(num_elements + 1).skip(1) {
 
         if containing_subsets.is_empty() {
             // No subset contains this element - impossible to cover
@@ -117,28 +116,28 @@ fn print_solution(solver: &CDCLSolver, subsets: &[Vec<usize>]) {
     println!("Exact cover found:");
     let mut selected = Vec::new();
 
-    for i in 0..subsets.len() {
+    for (i, subset) in subsets.iter().enumerate() {
         if solver.get_value(var(i)) == Some(true) {
             selected.push(i + 1); // 1-indexed for display
             print!("  Subset {}: {{", i + 1);
-            for (j, &elem) in subsets[i].iter().enumerate() {
+            for (j, &elem) in subset.iter().enumerate() {
                 if j > 0 {
                     print!(", ");
                 }
-                print!("{}", elem);
+                print!("{elem}");
             }
             println!("}}");
         }
     }
 
-    println!("\nSelected subsets: {:?}", selected);
+    println!("\nSelected subsets: {selected:?}");
 }
 
 fn main() {
     let (num_elements, subsets) = match parse_input() {
         Ok(data) => data,
         Err(e) => {
-            eprintln!("Parse error: {}", e);
+            eprintln!("Parse error: {e}");
             process::exit(1);
         }
     };
@@ -157,7 +156,7 @@ fn main() {
             println!("No exact cover exists");
         }
         Err(e) => {
-            eprintln!("Solver error: {}", e);
+            eprintln!("Solver error: {e}");
             process::exit(1);
         }
     }
@@ -238,6 +237,6 @@ mod tests {
         // Let's just check if there's any solution
         let result = solver.solve().unwrap();
         // May or may not have solution depending on constraints
-        println!("Pentomino-style has solution: {}", result);
+        println!("Pentomino-style has solution: {result}");
     }
 }

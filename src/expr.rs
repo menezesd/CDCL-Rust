@@ -49,8 +49,8 @@ pub enum Expr {
     Equiv(Box<Expr>, Box<Expr>),
 }
 
-impl Expr {
-    /// Converts the expression to its string representation in prefix notation.
+impl std::fmt::Display for Expr {
+    /// Formats the expression in prefix notation.
     ///
     /// This produces a string that can be parsed back by the `Parser`.
     ///
@@ -65,14 +65,14 @@ impl Expr {
     /// );
     /// assert_eq!(expr.to_string(), "(and x1 x2)");
     /// ```
-    pub fn to_string(&self) -> String {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::Var(v) => format!("x{}", v),
-            Expr::Not(e) => format!("(not {})", e.to_string()),
-            Expr::And(a, b) => format!("(and {} {})", a.to_string(), b.to_string()),
-            Expr::Or(a, b) => format!("(or {} {})", a.to_string(), b.to_string()),
-            Expr::Impl(a, b) => format!("(impl {} {})", a.to_string(), b.to_string()),
-            Expr::Equiv(a, b) => format!("(equiv {} {})", a.to_string(), b.to_string()),
+            Expr::Var(v) => write!(f, "x{v}"),
+            Expr::Not(e) => write!(f, "(not {e})"),
+            Expr::And(a, b) => write!(f, "(and {a} {b})"),
+            Expr::Or(a, b) => write!(f, "(or {a} {b})"),
+            Expr::Impl(a, b) => write!(f, "(impl {a} {b})"),
+            Expr::Equiv(a, b) => write!(f, "(equiv {a} {b})"),
         }
     }
 }
@@ -102,13 +102,19 @@ impl Expr {
 /// assert_eq!(find_max_var(&expr), 5);
 /// ```
 pub fn find_max_var(expr: &Expr) -> i32 {
-    match expr {
-        Expr::Var(v) => *v,
-        Expr::Not(e) => find_max_var(e),
-        Expr::And(e1, e2) | Expr::Or(e1, e2) | Expr::Impl(e1, e2) | Expr::Equiv(e1, e2) => {
-            find_max_var(e1).max(find_max_var(e2))
+    let mut max = 0;
+    let mut stack = vec![expr];
+    while let Some(e) = stack.pop() {
+        match e {
+            Expr::Var(v) => max = max.max(*v),
+            Expr::Not(inner) => stack.push(inner),
+            Expr::And(a, b) | Expr::Or(a, b) | Expr::Impl(a, b) | Expr::Equiv(a, b) => {
+                stack.push(a);
+                stack.push(b);
+            }
         }
     }
+    max
 }
 
 #[cfg(test)]

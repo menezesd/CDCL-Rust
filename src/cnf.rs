@@ -48,12 +48,23 @@ use crate::{Clause, Expr, Literal};
 /// assert!(!is_clause(&not_clause));
 /// ```
 pub fn is_clause(expr: &Expr) -> bool {
-    match expr {
-        Expr::Var(_) => true,
-        Expr::Not(e) => matches!(e.as_ref(), Expr::Var(_)),
-        Expr::Or(e1, e2) => is_clause(e1) && is_clause(e2),
-        _ => false,
+    let mut stack = vec![expr];
+    while let Some(e) = stack.pop() {
+        match e {
+            Expr::Var(_) => {}
+            Expr::Not(inner) => {
+                if !matches!(inner.as_ref(), Expr::Var(_)) {
+                    return false;
+                }
+            }
+            Expr::Or(a, b) => {
+                stack.push(a);
+                stack.push(b);
+            }
+            _ => return false,
+        }
     }
+    true
 }
 
 /// Extracts literals from a clause expression.
@@ -70,24 +81,26 @@ pub fn is_clause(expr: &Expr) -> bool {
 ///
 /// `true` if extraction succeeded, `false` if the expression is not a valid clause.
 pub fn extract_clause_literals(expr: &Expr, lits: &mut Vec<Literal>) -> bool {
-    match expr {
-        Expr::Var(v) => {
-            lits.push(Literal::positive(*v));
-            true
-        }
-        Expr::Not(e) => {
-            if let Expr::Var(v) = e.as_ref() {
-                lits.push(Literal::negative(*v));
-                true
-            } else {
-                false
+    let mut stack = vec![expr];
+    while let Some(e) = stack.pop() {
+        match e {
+            Expr::Var(v) => lits.push(Literal::positive(*v)),
+            Expr::Not(inner) => {
+                if let Expr::Var(v) = inner.as_ref() {
+                    lits.push(Literal::negative(*v));
+                } else {
+                    return false;
+                }
             }
+            Expr::Or(a, b) => {
+                // Push b first so a is popped (processed) first, preserving order
+                stack.push(b);
+                stack.push(a);
+            }
+            _ => return false,
         }
-        Expr::Or(e1, e2) => {
-            extract_clause_literals(e1, lits) && extract_clause_literals(e2, lits)
-        }
-        _ => false,
     }
+    true
 }
 
 /// Checks if an expression is in Conjunctive Normal Form (CNF).
@@ -129,12 +142,21 @@ pub fn extract_clause_literals(expr: &Expr, lits: &mut Vec<Literal>) -> bool {
 /// assert!(!is_cnf(&not_cnf));
 /// ```
 pub fn is_cnf(expr: &Expr) -> bool {
-    match expr {
-        Expr::And(e1, e2) => {
-            (is_cnf(e1) || is_clause(e1)) && (is_cnf(e2) || is_clause(e2))
+    let mut stack = vec![expr];
+    while let Some(e) = stack.pop() {
+        match e {
+            Expr::And(a, b) => {
+                stack.push(a);
+                stack.push(b);
+            }
+            _ => {
+                if !is_clause(e) {
+                    return false;
+                }
+            }
         }
-        _ => is_clause(expr),
     }
+    true
 }
 
 /// Extracts clauses from a CNF expression.
@@ -169,20 +191,21 @@ pub fn is_cnf(expr: &Expr) -> bool {
 /// assert_eq!(clauses.len(), 2);
 /// ```
 pub fn extract_cnf_clauses(expr: &Expr, clauses: &mut Vec<Clause>) -> bool {
-    match expr {
-        Expr::And(e1, e2) => {
-            extract_cnf_clauses(e1, clauses) && extract_cnf_clauses(e2, clauses)
-        }
-        _ => {
+    let mut stack = vec![expr];
+    while let Some(e) = stack.pop() {
+        if let Expr::And(a, b) = e {
+            stack.push(a);
+            stack.push(b);
+        } else {
             let mut lits = Vec::new();
-            if extract_clause_literals(expr, &mut lits) {
+            if extract_clause_literals(e, &mut lits) {
                 clauses.push(Clause::new(lits));
-                true
             } else {
-                false
+                return false;
             }
         }
     }
+    true
 }
 
 #[cfg(test)]

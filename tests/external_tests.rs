@@ -10,27 +10,26 @@ use cdcl_sat::solve_formula;
 /// Helper to run a test file and check the result
 fn run_test_file(path: &str, expected_sat: bool) {
     let content = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
+        .unwrap_or_else(|e| panic!("Failed to read {path}: {e}"));
     let result = solve_formula(&content)
-        .unwrap_or_else(|e| panic!("Solver error on {}: {}", path, e));
-    assert_eq!(result, expected_sat, "Wrong result for {}", path);
+        .unwrap_or_else(|e| panic!("Solver error on {path}: {e}"));
+    assert_eq!(result, expected_sat, "Wrong result for {path}");
 }
 
 /// Helper to run a test file with a time limit
 fn run_timed_test(path: &str, expected_sat: bool, time_limit: Duration) {
     let content = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
+        .unwrap_or_else(|e| panic!("Failed to read {path}: {e}"));
 
     let start = Instant::now();
     let result = solve_formula(&content)
-        .unwrap_or_else(|e| panic!("Solver error on {}: {}", path, e));
+        .unwrap_or_else(|e| panic!("Solver error on {path}: {e}"));
     let elapsed = start.elapsed();
 
-    assert_eq!(result, expected_sat, "Wrong result for {}", path);
+    assert_eq!(result, expected_sat, "Wrong result for {path}");
     assert!(
         elapsed < time_limit,
-        "Test {} took {:?}, exceeding limit of {:?}",
-        path, elapsed, time_limit
+        "Test {path} took {elapsed:?}, exceeding limit of {time_limit:?}"
     );
 }
 

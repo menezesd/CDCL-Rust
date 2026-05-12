@@ -177,6 +177,7 @@ fn find_valid_assignments(
     valid
 }
 
+#[allow(clippy::too_many_arguments)]
 fn permute_digits(
     letters: &[char],
     num_letters: usize,
@@ -207,7 +208,7 @@ fn permute_digits(
     }
 
     let c = letters[pos];
-    let start = if leading.contains(&c) { 1 } else { 0 };
+    let start = usize::from(leading.contains(&c));
 
     for d in start..10 {
         if !used[d] {
@@ -273,7 +274,7 @@ fn main() {
         process::exit(1);
     }
 
-    println!("Solving: {} + {} = {}", word1, word2, result);
+    println!("Solving: {word1} + {word2} = {result}");
     println!();
 
     match solve_cryptarithmetic(&word1, &word2, &result) {
@@ -282,7 +283,7 @@ fn main() {
             let mut sorted: Vec<_> = solution.iter().collect();
             sorted.sort_by_key(|&(c, _)| c);
             for (&c, &d) in &sorted {
-                println!("  {} = {}", c, d);
+                println!("  {c} = {d}");
             }
             println!();
 
@@ -293,7 +294,7 @@ fn main() {
             println!("  {:>width$}", v1, width = result.len());
             println!("+ {:>width$}", v2, width = result.len());
             println!("{}", "-".repeat(result.len() + 2));
-            println!("  {}", vr);
+            println!("  {vr}");
         }
         None => {
             println!("No solution exists");

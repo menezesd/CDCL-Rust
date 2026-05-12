@@ -242,15 +242,15 @@ fn extract_solution(solver: &CDCLSolver, n: usize) -> Option<Vec<Vec<usize>>> {
     let n2 = n * n;
     let mut grid = vec![vec![0usize; n]; n];
 
-    for r in 0..n {
-        for c in 0..n {
+    for (r, grid_row) in grid.iter_mut().enumerate().take(n) {
+        for (c, cell) in grid_row.iter_mut().enumerate().take(n) {
             for v in 1..=n2 {
                 if solver.get_value(var(n, r, c, v)) == Some(true) {
-                    grid[r][c] = v;
+                    *cell = v;
                     break;
                 }
             }
-            if grid[r][c] == 0 {
+            if *cell == 0 {
                 return None;
             }
         }
@@ -262,20 +262,20 @@ fn extract_solution(solver: &CDCLSolver, n: usize) -> Option<Vec<Vec<usize>>> {
 fn print_magic_square(grid: &[Vec<usize>]) {
     let n = grid.len();
     let max_val = n * n;
-    let width = format!("{}", max_val).len();
+    let width = format!("{max_val}").len();
 
     for row in grid {
         for (i, &val) in row.iter().enumerate() {
             if i > 0 {
                 print!(" ");
             }
-            print!("{:>width$}", val, width = width);
+            print!("{val:>width$}");
         }
         println!();
     }
 
     let magic_sum: usize = grid[0].iter().sum();
-    println!("\nMagic constant: {}", magic_sum);
+    println!("\nMagic constant: {magic_sum}");
 }
 
 fn main() {
@@ -307,7 +307,7 @@ fn main() {
     match solver.solve() {
         Ok(true) => {
             if let Some(grid) = extract_solution(&solver, n) {
-                println!("{}x{} Magic Square:", n, n);
+                println!("{n}x{n} Magic Square:");
                 print_magic_square(&grid);
             } else {
                 eprintln!("Error: Could not extract solution");
@@ -315,10 +315,10 @@ fn main() {
             }
         }
         Ok(false) => {
-            println!("No {}x{} magic square exists", n, n);
+            println!("No {n}x{n} magic square exists");
         }
         Err(e) => {
-            eprintln!("Solver error: {}", e);
+            eprintln!("Solver error: {e}");
             process::exit(1);
         }
     }

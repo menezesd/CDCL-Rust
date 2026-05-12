@@ -84,122 +84,147 @@ impl TseitinTransformer {
     ///
     /// The variable number representing this expression's result.
     pub fn transform(&mut self, expr: &Expr) -> i32 {
-        match expr {
-            // Variables pass through unchanged
-            Expr::Var(v) => *v,
+        enum Task<'a> {
+            Visit(&'a Expr),
+            BuildNot,
+            BuildAnd,
+            BuildOr,
+            BuildImpl,
+            BuildEquiv,
+        }
 
-            // NOT: r ↔ ¬a
-            // Clauses: (r ∨ a) ∧ (¬r ∨ ¬a)
-            Expr::Not(e) => {
-                let sub = self.transform(e);
-                let result = self.fresh_var();
-                self.clauses.push(Clause::new(vec![
-                    Literal::positive(result),
-                    Literal::positive(sub),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::negative(result),
-                    Literal::negative(sub),
-                ]));
-                result
-            }
+        let mut stack: Vec<Task> = vec![Task::Visit(expr)];
+        let mut results: Vec<i32> = Vec::new();
 
-            // AND: r ↔ a ∧ b
-            // Clauses: (¬r ∨ a) ∧ (¬r ∨ b) ∧ (r ∨ ¬a ∨ ¬b)
-            Expr::And(e1, e2) => {
-                let sub1 = self.transform(e1);
-                let sub2 = self.transform(e2);
-                let result = self.fresh_var();
-                self.clauses.push(Clause::new(vec![
-                    Literal::negative(result),
-                    Literal::positive(sub1),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::negative(result),
-                    Literal::positive(sub2),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::positive(result),
-                    Literal::negative(sub1),
-                    Literal::negative(sub2),
-                ]));
-                result
-            }
-
-            // OR: r ↔ a ∨ b
-            // Clauses: (¬r ∨ a ∨ b) ∧ (r ∨ ¬a) ∧ (r ∨ ¬b)
-            Expr::Or(e1, e2) => {
-                let sub1 = self.transform(e1);
-                let sub2 = self.transform(e2);
-                let result = self.fresh_var();
-                self.clauses.push(Clause::new(vec![
-                    Literal::negative(result),
-                    Literal::positive(sub1),
-                    Literal::positive(sub2),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::positive(result),
-                    Literal::negative(sub1),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::positive(result),
-                    Literal::negative(sub2),
-                ]));
-                result
-            }
-
-            // IMPL: r ↔ (a → b) which is r ↔ (¬a ∨ b)
-            // Clauses: (¬r ∨ ¬a ∨ b) ∧ (r ∨ a) ∧ (r ∨ ¬b)
-            Expr::Impl(e1, e2) => {
-                let sub1 = self.transform(e1);
-                let sub2 = self.transform(e2);
-                let result = self.fresh_var();
-                self.clauses.push(Clause::new(vec![
-                    Literal::negative(result),
-                    Literal::negative(sub1),
-                    Literal::positive(sub2),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::positive(result),
-                    Literal::positive(sub1),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::positive(result),
-                    Literal::negative(sub2),
-                ]));
-                result
-            }
-
-            // EQUIV: r ↔ (a ↔ b)
-            // This is (a → b) ∧ (b → a) which gives 4 clauses
-            Expr::Equiv(e1, e2) => {
-                let sub1 = self.transform(e1);
-                let sub2 = self.transform(e2);
-                let result = self.fresh_var();
-                // r = true when a and b have same value
-                self.clauses.push(Clause::new(vec![
-                    Literal::negative(result),
-                    Literal::negative(sub1),
-                    Literal::positive(sub2),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::negative(result),
-                    Literal::negative(sub2),
-                    Literal::positive(sub1),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::positive(result),
-                    Literal::positive(sub1),
-                    Literal::positive(sub2),
-                ]));
-                self.clauses.push(Clause::new(vec![
-                    Literal::positive(result),
-                    Literal::negative(sub1),
-                    Literal::negative(sub2),
-                ]));
-                result
+        while let Some(task) = stack.pop() {
+            match task {
+                Task::Visit(e) => match e {
+                    Expr::Var(v) => results.push(*v),
+                    Expr::Not(inner) => {
+                        stack.push(Task::BuildNot);
+                        stack.push(Task::Visit(inner));
+                    }
+                    Expr::And(a, b) => {
+                        stack.push(Task::BuildAnd);
+                        stack.push(Task::Visit(b));
+                        stack.push(Task::Visit(a));
+                    }
+                    Expr::Or(a, b) => {
+                        stack.push(Task::BuildOr);
+                        stack.push(Task::Visit(b));
+                        stack.push(Task::Visit(a));
+                    }
+                    Expr::Impl(a, b) => {
+                        stack.push(Task::BuildImpl);
+                        stack.push(Task::Visit(b));
+                        stack.push(Task::Visit(a));
+                    }
+                    Expr::Equiv(a, b) => {
+                        stack.push(Task::BuildEquiv);
+                        stack.push(Task::Visit(b));
+                        stack.push(Task::Visit(a));
+                    }
+                },
+                Task::BuildNot => {
+                    let sub = results.pop().unwrap();
+                    let result = self.fresh_var();
+                    self.clauses.push(Clause::new(vec![
+                        Literal::positive(result),
+                        Literal::positive(sub),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::negative(result),
+                        Literal::negative(sub),
+                    ]));
+                    results.push(result);
+                }
+                Task::BuildAnd => {
+                    let sub2 = results.pop().unwrap();
+                    let sub1 = results.pop().unwrap();
+                    let result = self.fresh_var();
+                    self.clauses.push(Clause::new(vec![
+                        Literal::negative(result),
+                        Literal::positive(sub1),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::negative(result),
+                        Literal::positive(sub2),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::positive(result),
+                        Literal::negative(sub1),
+                        Literal::negative(sub2),
+                    ]));
+                    results.push(result);
+                }
+                Task::BuildOr => {
+                    let sub2 = results.pop().unwrap();
+                    let sub1 = results.pop().unwrap();
+                    let result = self.fresh_var();
+                    self.clauses.push(Clause::new(vec![
+                        Literal::negative(result),
+                        Literal::positive(sub1),
+                        Literal::positive(sub2),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::positive(result),
+                        Literal::negative(sub1),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::positive(result),
+                        Literal::negative(sub2),
+                    ]));
+                    results.push(result);
+                }
+                Task::BuildImpl => {
+                    let sub2 = results.pop().unwrap();
+                    let sub1 = results.pop().unwrap();
+                    let result = self.fresh_var();
+                    self.clauses.push(Clause::new(vec![
+                        Literal::negative(result),
+                        Literal::negative(sub1),
+                        Literal::positive(sub2),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::positive(result),
+                        Literal::positive(sub1),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::positive(result),
+                        Literal::negative(sub2),
+                    ]));
+                    results.push(result);
+                }
+                Task::BuildEquiv => {
+                    let sub2 = results.pop().unwrap();
+                    let sub1 = results.pop().unwrap();
+                    let result = self.fresh_var();
+                    self.clauses.push(Clause::new(vec![
+                        Literal::negative(result),
+                        Literal::negative(sub1),
+                        Literal::positive(sub2),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::negative(result),
+                        Literal::negative(sub2),
+                        Literal::positive(sub1),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::positive(result),
+                        Literal::positive(sub1),
+                        Literal::positive(sub2),
+                    ]));
+                    self.clauses.push(Clause::new(vec![
+                        Literal::positive(result),
+                        Literal::negative(sub1),
+                        Literal::negative(sub2),
+                    ]));
+                    results.push(result);
+                }
             }
         }
+
+        results.pop().unwrap()
     }
 
     /// Finalizes the transformation and returns the CNF clauses.

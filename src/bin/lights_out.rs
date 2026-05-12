@@ -62,8 +62,8 @@ fn generate_lights_out_clauses(
     let num_cells = rows * cols;
     let mut next_aux = (num_cells + 1) as i32;
 
-    for r in 0..rows {
-        for c in 0..cols {
+    for (r, initial_row) in initial.iter().enumerate().take(rows) {
+        for (c, &target) in initial_row.iter().enumerate().take(cols) {
             // Find all buttons that affect this cell
             let affecting: Vec<i32> = (0..rows)
                 .flat_map(|br| (0..cols).map(move |bc| (br, bc)))
@@ -73,7 +73,6 @@ fn generate_lights_out_clauses(
 
             // The XOR of all affecting buttons must equal initial[r][c]
             // (if initial is 1, we need odd toggles; if 0, we need even toggles)
-            let target = initial[r][c];
 
             // Encode XOR constraint using auxiliary variables
             clauses.extend(encode_xor_equals(&affecting, target, &mut next_aux));
@@ -239,14 +238,14 @@ fn print_solution(solver: &CDCLSolver, rows: usize, cols: usize) {
         println!();
     }
 
-    println!("\nTotal button presses: {}", count);
+    println!("\nTotal button presses: {count}");
 }
 
 fn main() {
     let (rows, cols, initial) = match parse_input() {
         Ok(data) => data,
         Err(e) => {
-            eprintln!("Parse error: {}", e);
+            eprintln!("Parse error: {e}");
             process::exit(1);
         }
     };
@@ -271,7 +270,7 @@ fn main() {
             println!("No solution exists (puzzle is unsolvable)");
         }
         Err(e) => {
-            eprintln!("Solver error: {}", e);
+            eprintln!("Solver error: {e}");
             process::exit(1);
         }
     }

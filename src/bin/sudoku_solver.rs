@@ -15,9 +15,9 @@ use cdcl_sat::{CDCLSolver, Clause, Literal};
 /// row, col, digit are 1-indexed (1-9).
 /// Returns a variable number from 1 to 729.
 fn var(row: usize, col: usize, digit: usize) -> i32 {
-    debug_assert!(row >= 1 && row <= 9);
-    debug_assert!(col >= 1 && col <= 9);
-    debug_assert!(digit >= 1 && digit <= 9);
+    debug_assert!((1..=9).contains(&row));
+    debug_assert!((1..=9).contains(&col));
+    debug_assert!((1..=9).contains(&digit));
     (81 * (row - 1) + 9 * (col - 1) + digit) as i32
 }
 
@@ -174,7 +174,7 @@ fn parse_puzzle(input: &str) -> Result<Vec<(usize, usize, usize)>, String> {
                 clues.push((row, col, digit));
             }
             '0' | '.' => {}
-            _ => return Err(format!("Invalid character '{}' at position {}", ch, i)),
+            _ => return Err(format!("Invalid character '{ch}' at position {i}")),
         }
     }
 
@@ -196,9 +196,9 @@ fn extract_solution(solver: &CDCLSolver) -> Option<[[u8; 9]; 9]> {
     }
 
     // Verify all cells are filled
-    for r in 0..9 {
-        for c in 0..9 {
-            if grid[r][c] == 0 {
+    for row in &grid {
+        for &cell in row {
+            if cell == 0 {
                 return None;
             }
         }
@@ -217,7 +217,7 @@ fn print_grid(grid: &[[u8; 9]; 9]) {
             if j > 0 && j % 3 == 0 {
                 print!("| ");
             }
-            print!("{} ", digit);
+            print!("{digit} ");
         }
         println!();
     }
@@ -226,14 +226,14 @@ fn print_grid(grid: &[[u8; 9]; 9]) {
 fn main() {
     let mut input = String::new();
     if let Err(e) = io::stdin().read_to_string(&mut input) {
-        eprintln!("Error reading input: {}", e);
+        eprintln!("Error reading input: {e}");
         process::exit(1);
     }
 
     let clues = match parse_puzzle(&input) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Parse error: {}", e);
+            eprintln!("Parse error: {e}");
             process::exit(1);
         }
     };
@@ -254,7 +254,7 @@ fn main() {
             println!("UNSOLVABLE");
         }
         Err(e) => {
-            eprintln!("Solver error: {}", e);
+            eprintln!("Solver error: {e}");
             process::exit(1);
         }
     }

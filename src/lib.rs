@@ -58,6 +58,10 @@ pub mod literal;
 pub mod cnf;
 pub mod tseitin;
 pub mod solver;
+pub mod preprocess;
+pub mod heap;
+pub mod clause_arena;
+pub mod drat;
 
 #[cfg(test)]
 pub mod test_helpers;
@@ -87,8 +91,8 @@ pub enum SolveError {
 impl fmt::Display for SolveError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SolveError::Parse(e) => write!(f, "Parse error: {}", e),
-            SolveError::Solver(e) => write!(f, "Solver error: {}", e),
+            SolveError::Parse(e) => write!(f, "Parse error: {e}"),
+            SolveError::Solver(e) => write!(f, "Solver error: {e}"),
         }
     }
 }
@@ -258,11 +262,11 @@ mod integration_tests {
     #[test]
     fn test_solve_error_display() {
         let parse_err = SolveError::Parse(ParseError::UnknownOperator("test".to_string()));
-        let msg = format!("{}", parse_err);
+        let msg = format!("{parse_err}");
         assert!(msg.contains("Parse error"));
 
         let solver_err = SolveError::Solver(SolverError::InternalError("test".to_string()));
-        let msg2 = format!("{}", solver_err);
+        let msg2 = format!("{solver_err}");
         assert!(msg2.contains("Solver error"));
     }
 

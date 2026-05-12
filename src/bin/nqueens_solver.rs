@@ -166,21 +166,21 @@ fn main() {
 
     if count_mode {
         let count = count_solutions(n);
-        println!("{}-Queens has {} solutions", n, count);
+        println!("{n}-Queens has {count} solutions");
     } else {
         let clauses = generate_nqueens_clauses(n);
         let mut solver = CDCLSolver::new(clauses);
 
         match solver.solve() {
             Ok(true) => {
-                println!("{}-Queens solution:", n);
+                println!("{n}-Queens solution:");
                 print_solution(&solver, n);
             }
             Ok(false) => {
-                println!("No solution exists for {}-Queens", n);
+                println!("No solution exists for {n}-Queens");
             }
             Err(e) => {
-                eprintln!("Solver error: {}", e);
+                eprintln!("Solver error: {e}");
                 process::exit(1);
             }
         }

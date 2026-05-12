@@ -56,11 +56,11 @@ pub enum ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParseError::UnknownOperator(op) => write!(f, "Unknown operator: '{}'", op),
-            ParseError::InvalidVariable(var) => write!(f, "Invalid variable: '{}'", var),
-            ParseError::UnexpectedToken(tok) => write!(f, "Unexpected token: {}", tok),
+            ParseError::UnknownOperator(op) => write!(f, "Unknown operator: '{op}'"),
+            ParseError::InvalidVariable(var) => write!(f, "Invalid variable: '{var}'"),
+            ParseError::UnexpectedToken(tok) => write!(f, "Unexpected token: {tok}"),
             ParseError::ExpectedToken { expected, found } => {
-                write!(f, "Expected '{}', found '{}'", expected, found)
+                write!(f, "Expected '{expected}', found '{found}'")
             }
             ParseError::UnexpectedEndOfInput => write!(f, "Unexpected end of input"),
         }
@@ -125,7 +125,7 @@ impl Parser {
 
     /// Returns a reference to the next token without consuming it.
     fn peek(&self) -> Option<&str> {
-        self.tokens.front().map(|s| s.as_str())
+        self.tokens.front().map(std::string::String::as_str)
     }
 
     /// Consumes and returns the next token.
@@ -149,42 +149,114 @@ impl Parser {
     /// let expr = parser.parse().expect("Failed to parse");
     /// ```
     pub fn parse(&mut self) -> Result<Expr, ParseError> {
-        match self.peek() {
-            Some("(") => {
-                self.consume();
-                let op = self.consume().ok_or(ParseError::UnexpectedEndOfInput)?;
-                let expr = match op.as_str() {
-                    "not" => Expr::Not(Box::new(self.parse()?)),
-                    "and" => Expr::And(Box::new(self.parse()?), Box::new(self.parse()?)),
-                    "or" => Expr::Or(Box::new(self.parse()?), Box::new(self.parse()?)),
-                    "impl" => Expr::Impl(Box::new(self.parse()?), Box::new(self.parse()?)),
-                    "equiv" => Expr::Equiv(Box::new(self.parse()?), Box::new(self.parse()?)),
-                    _ => {
-                        // Check if it's a parenthesized variable like (x1)
-                        if let Some(num_str) = op.strip_prefix('x') {
+        // Iterative parser using an explicit task stack to avoid stack overflow
+        // on deeply nested inputs.
+        enum Task {
+            Parse,
+            BuildNot,
+            BuildAnd,
+            BuildOr,
+            BuildImpl,
+            BuildEquiv,
+            ExpectClose,
+        }
+
+        let mut task_stack: Vec<Task> = vec![Task::Parse];
+        let mut results: Vec<Expr> = Vec::new();
+
+        while let Some(task) = task_stack.pop() {
+            match task {
+                Task::Parse => {
+                    match self.peek() {
+                        Some("(") => {
+                            self.consume();
+                            let op = self.consume().ok_or(ParseError::UnexpectedEndOfInput)?;
+                            match op.as_str() {
+                                "not" => {
+                                    task_stack.push(Task::ExpectClose);
+                                    task_stack.push(Task::BuildNot);
+                                    task_stack.push(Task::Parse);
+                                }
+                                "and" => {
+                                    task_stack.push(Task::ExpectClose);
+                                    task_stack.push(Task::BuildAnd);
+                                    task_stack.push(Task::Parse);
+                                    task_stack.push(Task::Parse);
+                                }
+                                "or" => {
+                                    task_stack.push(Task::ExpectClose);
+                                    task_stack.push(Task::BuildOr);
+                                    task_stack.push(Task::Parse);
+                                    task_stack.push(Task::Parse);
+                                }
+                                "impl" => {
+                                    task_stack.push(Task::ExpectClose);
+                                    task_stack.push(Task::BuildImpl);
+                                    task_stack.push(Task::Parse);
+                                    task_stack.push(Task::Parse);
+                                }
+                                "equiv" => {
+                                    task_stack.push(Task::ExpectClose);
+                                    task_stack.push(Task::BuildEquiv);
+                                    task_stack.push(Task::Parse);
+                                    task_stack.push(Task::Parse);
+                                }
+                                _ => {
+                                    if let Some(num_str) = op.strip_prefix('x') {
+                                        let var_num: i32 = num_str
+                                            .parse()
+                                            .map_err(|_| ParseError::InvalidVariable(op.clone()))?;
+                                        self.expect(")")?;
+                                        results.push(Expr::Var(var_num));
+                                    } else {
+                                        return Err(ParseError::UnknownOperator(op));
+                                    }
+                                }
+                            }
+                        }
+                        Some(s) if s.starts_with('x') => {
+                            let var = self.consume().unwrap();
+                            let num_str = var.strip_prefix('x').unwrap();
                             let var_num: i32 = num_str
                                 .parse()
-                                .map_err(|_| ParseError::InvalidVariable(op.clone()))?;
-                            self.expect(")")?;
-                            return Ok(Expr::Var(var_num));
+                                .map_err(|_| ParseError::InvalidVariable(var.clone()))?;
+                            results.push(Expr::Var(var_num));
                         }
-                        return Err(ParseError::UnknownOperator(op));
+                        Some(other) => return Err(ParseError::UnexpectedToken(other.to_string())),
+                        None => return Err(ParseError::UnexpectedEndOfInput),
                     }
-                };
-                self.expect(")")?;
-                Ok(expr)
+                }
+                Task::BuildNot => {
+                    let inner = results.pop().ok_or(ParseError::UnexpectedEndOfInput)?;
+                    results.push(Expr::Not(Box::new(inner)));
+                }
+                Task::BuildAnd => {
+                    let right = results.pop().ok_or(ParseError::UnexpectedEndOfInput)?;
+                    let left = results.pop().ok_or(ParseError::UnexpectedEndOfInput)?;
+                    results.push(Expr::And(Box::new(left), Box::new(right)));
+                }
+                Task::BuildOr => {
+                    let right = results.pop().ok_or(ParseError::UnexpectedEndOfInput)?;
+                    let left = results.pop().ok_or(ParseError::UnexpectedEndOfInput)?;
+                    results.push(Expr::Or(Box::new(left), Box::new(right)));
+                }
+                Task::BuildImpl => {
+                    let right = results.pop().ok_or(ParseError::UnexpectedEndOfInput)?;
+                    let left = results.pop().ok_or(ParseError::UnexpectedEndOfInput)?;
+                    results.push(Expr::Impl(Box::new(left), Box::new(right)));
+                }
+                Task::BuildEquiv => {
+                    let right = results.pop().ok_or(ParseError::UnexpectedEndOfInput)?;
+                    let left = results.pop().ok_or(ParseError::UnexpectedEndOfInput)?;
+                    results.push(Expr::Equiv(Box::new(left), Box::new(right)));
+                }
+                Task::ExpectClose => {
+                    self.expect(")")?;
+                }
             }
-            Some(s) if s.starts_with('x') => {
-                let var = self.consume().unwrap();
-                let num_str = var.strip_prefix('x').unwrap();
-                let var_num: i32 = num_str
-                    .parse()
-                    .map_err(|_| ParseError::InvalidVariable(var.clone()))?;
-                Ok(Expr::Var(var_num))
-            }
-            Some(other) => Err(ParseError::UnexpectedToken(other.to_string())),
-            None => Err(ParseError::UnexpectedEndOfInput),
         }
+
+        results.pop().ok_or(ParseError::UnexpectedEndOfInput)
     }
 
     /// Expects and consumes a specific token.

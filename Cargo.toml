@@ -3,6 +3,9 @@ name = "cdcl_sat"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+stats = []
+
 [dependencies]
 rand = "0.8"
 

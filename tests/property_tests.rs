@@ -35,42 +35,42 @@ proptest! {
     /// Any single variable is satisfiable.
     #[test]
     fn prop_single_var_sat(var in 1..100i32) {
-        let formula = format!("x{}", var);
+        let formula = format!("x{var}");
         prop_assert!(solve_formula(&formula).unwrap());
     }
 
     /// x AND NOT x is always unsatisfiable.
     #[test]
     fn prop_contradiction_unsat(var in 1..100i32) {
-        let formula = format!("(and x{} (not x{}))", var, var);
+        let formula = format!("(and x{var} (not x{var}))");
         prop_assert!(!solve_formula(&formula).unwrap());
     }
 
     /// x OR NOT x is always satisfiable (tautology).
     #[test]
     fn prop_tautology_sat(var in 1..100i32) {
-        let formula = format!("(or x{} (not x{}))", var, var);
+        let formula = format!("(or x{var} (not x{var}))");
         prop_assert!(solve_formula(&formula).unwrap());
     }
 
     /// x IMPL x is always satisfiable (reflexive implication).
     #[test]
     fn prop_reflexive_impl_sat(var in 1..100i32) {
-        let formula = format!("(impl x{} x{})", var, var);
+        let formula = format!("(impl x{var} x{var})");
         prop_assert!(solve_formula(&formula).unwrap());
     }
 
     /// x EQUIV x is always satisfiable (reflexive equivalence).
     #[test]
     fn prop_reflexive_equiv_sat(var in 1..100i32) {
-        let formula = format!("(equiv x{} x{})", var, var);
+        let formula = format!("(equiv x{var} x{var})");
         prop_assert!(solve_formula(&formula).unwrap());
     }
 
     /// NOT NOT x should be satisfiable.
     #[test]
     fn prop_double_negation(var in 1..100i32) {
-        let formula = format!("(not (not x{}))", var);
+        let formula = format!("(not (not x{var}))");
         prop_assert!(solve_formula(&formula).unwrap());
     }
 
@@ -78,8 +78,7 @@ proptest! {
     #[test]
     fn prop_xor_like_sat(x in 1..50i32, y in 51..100i32) {
         let formula = format!(
-            "(or (and x{} x{}) (and (not x{}) (not x{})))",
-            x, y, x, y
+            "(or (and x{x} x{y}) (and (not x{x}) (not x{y})))"
         );
         prop_assert!(solve_formula(&formula).unwrap());
     }
@@ -97,7 +96,7 @@ proptest! {
     /// Implication chain with contradiction is unsatisfiable.
     #[test]
     fn prop_impl_chain_unsat(n in 2..5usize) {
-        let mut formula = format!("(and x1 (not x{}))", n);
+        let mut formula = format!("(and x1 (not x{n}))");
         for i in 1..n {
             formula = format!("(and {} (impl x{} x{}))", formula, i, i + 1);
         }
@@ -135,21 +134,21 @@ proptest! {
             for j in 0..clause_size {
                 let var = (j as i32 % num_vars) + 1;
                 let lit = if j % 2 == 0 {
-                    format!("x{}", var)
+                    format!("x{var}")
                 } else {
-                    format!("(not x{})", var)
+                    format!("(not x{var})")
                 };
                 if clause.is_empty() {
                     clause = lit;
                 } else {
-                    clause = format!("(or {} {})", clause, lit);
+                    clause = format!("(or {clause} {lit})");
                 }
             }
             clauses.push(clause);
         }
         let mut formula = clauses[0].clone();
         for clause in clauses.iter().skip(1) {
-            formula = format!("(and {} {})", formula, clause);
+            formula = format!("(and {formula} {clause})");
         }
         let _result = solve_formula(&formula).unwrap();
     }
@@ -157,8 +156,8 @@ proptest! {
     /// De Morgan's laws - NOT (a AND b) = NOT a OR NOT b.
     #[test]
     fn prop_demorgan_and(a in 1..50i32, b in 51..100i32) {
-        let formula1 = format!("(not (and x{} x{}))", a, b);
-        let formula2 = format!("(or (not x{}) (not x{}))", a, b);
+        let formula1 = format!("(not (and x{a} x{b}))");
+        let formula2 = format!("(or (not x{a}) (not x{b}))");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -168,8 +167,8 @@ proptest! {
     /// De Morgan's laws - NOT (a OR b) = NOT a AND NOT b.
     #[test]
     fn prop_demorgan_or(a in 1..50i32, b in 51..100i32) {
-        let formula1 = format!("(not (or x{} x{}))", a, b);
-        let formula2 = format!("(and (not x{}) (not x{}))", a, b);
+        let formula1 = format!("(not (or x{a} x{b}))");
+        let formula2 = format!("(and (not x{a}) (not x{b}))");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -179,8 +178,8 @@ proptest! {
     /// Implication equivalence - (a IMPL b) = (NOT a OR b).
     #[test]
     fn prop_impl_equiv(a in 1..50i32, b in 51..100i32) {
-        let formula1 = format!("(impl x{} x{})", a, b);
-        let formula2 = format!("(or (not x{}) x{})", a, b);
+        let formula1 = format!("(impl x{a} x{b})");
+        let formula2 = format!("(or (not x{a}) x{b})");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -190,8 +189,8 @@ proptest! {
     /// Equivalence definition - (a EQUIV b) = (a IMPL b) AND (b IMPL a).
     #[test]
     fn prop_equiv_definition(a in 1..50i32, b in 51..100i32) {
-        let formula1 = format!("(equiv x{} x{})", a, b);
-        let formula2 = format!("(and (impl x{} x{}) (impl x{} x{}))", a, b, b, a);
+        let formula1 = format!("(equiv x{a} x{b})");
+        let formula2 = format!("(and (impl x{a} x{b}) (impl x{b} x{a}))");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -201,8 +200,8 @@ proptest! {
     /// Commutative AND.
     #[test]
     fn prop_and_commutative(a in 1..50i32, b in 51..100i32) {
-        let formula1 = format!("(and x{} x{})", a, b);
-        let formula2 = format!("(and x{} x{})", b, a);
+        let formula1 = format!("(and x{a} x{b})");
+        let formula2 = format!("(and x{b} x{a})");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -212,8 +211,8 @@ proptest! {
     /// Commutative OR.
     #[test]
     fn prop_or_commutative(a in 1..50i32, b in 51..100i32) {
-        let formula1 = format!("(or x{} x{})", a, b);
-        let formula2 = format!("(or x{} x{})", b, a);
+        let formula1 = format!("(or x{a} x{b})");
+        let formula2 = format!("(or x{b} x{a})");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -223,8 +222,8 @@ proptest! {
     /// Commutative EQUIV.
     #[test]
     fn prop_equiv_commutative(a in 1..50i32, b in 51..100i32) {
-        let formula1 = format!("(equiv x{} x{})", a, b);
-        let formula2 = format!("(equiv x{} x{})", b, a);
+        let formula1 = format!("(equiv x{a} x{b})");
+        let formula2 = format!("(equiv x{b} x{a})");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -234,8 +233,8 @@ proptest! {
     /// Associative AND.
     #[test]
     fn prop_and_associative(a in 1..33i32, b in 34..66i32, c in 67..100i32) {
-        let formula1 = format!("(and (and x{} x{}) x{})", a, b, c);
-        let formula2 = format!("(and x{} (and x{} x{}))", a, b, c);
+        let formula1 = format!("(and (and x{a} x{b}) x{c})");
+        let formula2 = format!("(and x{a} (and x{b} x{c}))");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -245,8 +244,8 @@ proptest! {
     /// Associative OR.
     #[test]
     fn prop_or_associative(a in 1..33i32, b in 34..66i32, c in 67..100i32) {
-        let formula1 = format!("(or (or x{} x{}) x{})", a, b, c);
-        let formula2 = format!("(or x{} (or x{} x{}))", a, b, c);
+        let formula1 = format!("(or (or x{a} x{b}) x{c})");
+        let formula2 = format!("(or x{a} (or x{b} x{c}))");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -256,15 +255,15 @@ proptest! {
     /// Absorption - a AND (a OR b) is satisfiable.
     #[test]
     fn prop_absorption_and(a in 1..50i32, b in 51..100i32) {
-        let formula = format!("(and x{} (or x{} x{}))", a, a, b);
+        let formula = format!("(and x{a} (or x{a} x{b}))");
         prop_assert!(solve_formula(&formula).unwrap());
     }
 
     /// Idempotent AND - a AND a = a.
     #[test]
     fn prop_idempotent_and(a in 1..100i32) {
-        let formula1 = format!("x{}", a);
-        let formula2 = format!("(and x{} x{})", a, a);
+        let formula1 = format!("x{a}");
+        let formula2 = format!("(and x{a} x{a})");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()
@@ -274,8 +273,8 @@ proptest! {
     /// Idempotent OR - a OR a = a.
     #[test]
     fn prop_idempotent_or(a in 1..100i32) {
-        let formula1 = format!("x{}", a);
-        let formula2 = format!("(or x{} x{})", a, a);
+        let formula1 = format!("x{a}");
+        let formula2 = format!("(or x{a} x{a})");
         prop_assert_eq!(
             solve_formula(&formula1).unwrap(),
             solve_formula(&formula2).unwrap()

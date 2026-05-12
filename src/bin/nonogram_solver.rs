@@ -78,16 +78,16 @@ fn generate_patterns_recursive(
 
     for pos in start_pos..=max_start {
         // Place this run starting at pos
-        for i in pos..(pos + clue) {
-            current[i] = true;
+        for cell in current.iter_mut().skip(pos).take(clue) {
+            *cell = true;
         }
 
         let next_start = pos + clue + 1; // +1 for mandatory gap
         generate_patterns_recursive(line_len, remaining_clues, next_start, current, patterns);
 
         // Undo
-        for i in pos..(pos + clue) {
-            current[i] = false;
+        for cell in current.iter_mut().skip(pos).take(clue) {
+            *cell = false;
         }
     }
 }
@@ -213,7 +213,9 @@ fn encode_col_patterns(
 }
 
 /// Parse input and return (rows, cols, row_clues, col_clues).
-fn parse_input() -> Result<(usize, usize, Vec<Vec<usize>>, Vec<Vec<usize>>), String> {
+type NonogramInput = (usize, usize, Vec<Vec<usize>>, Vec<Vec<usize>>);
+
+fn parse_input() -> Result<NonogramInput, String> {
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
 
@@ -284,7 +286,7 @@ fn main() {
     let (rows, cols, row_clues, col_clues) = match parse_input() {
         Ok(data) => data,
         Err(e) => {
-            eprintln!("Parse error: {}", e);
+            eprintln!("Parse error: {e}");
             process::exit(1);
         }
     };
@@ -323,7 +325,7 @@ fn main() {
             println!("UNSOLVABLE");
         }
         Err(e) => {
-            eprintln!("Solver error: {}", e);
+            eprintln!("Solver error: {e}");
             process::exit(1);
         }
     }
@@ -374,8 +376,8 @@ mod tests {
         // Clues: rows [1], [1], [1], cols [1], [1], [1]
         let rows = 3;
         let cols = 3;
-        let row_clues = vec![vec![1], vec![1], vec![1]];
-        let col_clues = vec![vec![1], vec![1], vec![1]];
+        let row_clues = [vec![1], vec![1], vec![1]];
+        let col_clues = [vec![1], vec![1], vec![1]];
 
         let mut clauses = Vec::new();
         let mut next_aux = (rows * cols + 1) as i32;

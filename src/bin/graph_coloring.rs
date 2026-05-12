@@ -71,7 +71,9 @@ fn generate_coloring_clauses(
     clauses
 }
 
-fn parse_input() -> Result<(usize, usize, Vec<(usize, usize)>), String> {
+type ColoringInput = (usize, usize, Vec<(usize, usize)>);
+
+fn parse_input() -> Result<ColoringInput, String> {
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
 
@@ -122,7 +124,7 @@ fn print_coloring(solver: &CDCLSolver, num_vertices: usize, num_colors: usize) {
                 } else {
                     "Color"
                 };
-                println!("Vertex {}: {} ({})", v, color_name, c);
+                println!("Vertex {v}: {color_name} ({c})");
                 break;
             }
         }
@@ -133,7 +135,7 @@ fn main() {
     let (num_vertices, num_colors, edges) = match parse_input() {
         Ok(data) => data,
         Err(e) => {
-            eprintln!("Parse error: {}", e);
+            eprintln!("Parse error: {e}");
             process::exit(1);
         }
     };
@@ -143,14 +145,14 @@ fn main() {
 
     match solver.solve() {
         Ok(true) => {
-            println!("Graph is {}-colorable:", num_colors);
+            println!("Graph is {num_colors}-colorable:");
             print_coloring(&solver, num_vertices, num_colors);
         }
         Ok(false) => {
-            println!("Graph is NOT {}-colorable", num_colors);
+            println!("Graph is NOT {num_colors}-colorable");
         }
         Err(e) => {
-            eprintln!("Solver error: {}", e);
+            eprintln!("Solver error: {e}");
             process::exit(1);
         }
     }

@@ -24,6 +24,7 @@ fn var(num_vertices: usize, vertex: usize, position: usize) -> i32 {
 }
 
 /// Generate Hamiltonian path/cycle constraints.
+#[allow(clippy::needless_range_loop)]
 fn generate_hamiltonian_clauses(
     num_vertices: usize,
     edges: &[(usize, usize)],
@@ -116,7 +117,9 @@ fn generate_hamiltonian_clauses(
     clauses
 }
 
-fn parse_input() -> Result<(usize, Vec<(usize, usize)>, bool), String> {
+type GraphInput = (usize, Vec<(usize, usize)>, bool);
+
+fn parse_input() -> Result<GraphInput, String> {
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
 
@@ -173,7 +176,7 @@ fn main() {
     let (num_vertices, edges, find_cycle) = match parse_input() {
         Ok(data) => data,
         Err(e) => {
-            eprintln!("Parse error: {}", e);
+            eprintln!("Parse error: {e}");
             process::exit(1);
         }
     };
@@ -188,10 +191,10 @@ fn main() {
     match solver.solve() {
         Ok(true) => {
             let path = extract_path(&solver, num_vertices);
-            println!("\nHamiltonian {}:", path_type);
+            println!("\nHamiltonian {path_type}:");
             print!("{}", path[0]);
             for &v in &path[1..] {
-                print!(" -> {}", v);
+                print!(" -> {v}");
             }
             if find_cycle {
                 print!(" -> {}", path[0]);
@@ -199,10 +202,10 @@ fn main() {
             println!();
         }
         Ok(false) => {
-            println!("No Hamiltonian {} exists", path_type);
+            println!("No Hamiltonian {path_type} exists");
         }
         Err(e) => {
-            eprintln!("Solver error: {}", e);
+            eprintln!("Solver error: {e}");
             process::exit(1);
         }
     }
